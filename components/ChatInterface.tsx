@@ -1,8 +1,9 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Message, ToolCallLog, Language, Attachment } from '../types';
 import { GeminiOrchestrator } from '../services/geminiService';
 import { t } from '../translations';
-import { DEFAULT_MODEL_ID } from '../constants';
+import { DEFAULT_MODEL_ID, GEMINI_PRO_MODEL_ID } from '../constants';
 
 // --- Type Definitions for Web Speech API ---
 interface IWindow extends Window {
@@ -15,6 +16,13 @@ interface ChatInterfaceProps {
   lang: Language;
   activeModel: string;
 }
+
+const QUICK_ACTIONS = [
+  { id: 'anomalies', label: 'Anomalies', icon: '🧠', prompt: 'Run a full system anomaly analysis (analyzeAnomalies).' },
+  { id: 'cleaning', label: 'Cleaning', icon: '🧹', prompt: 'Check cleaning schedule (getCleaningSchedule) for current location.' },
+  { id: 'forecast', label: 'Forecast', icon: '🌤️', prompt: 'Get solar forecast for Bucharest (lat 44.4, lng 26.1) to test DNI/DHI.' },
+  { id: 'benchmark', label: 'Benchmark', icon: '📊', prompt: 'Run fleet benchmarking (runBenchmarking).' },
+];
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, activeModel }) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -133,8 +141,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
     }
   };
 
-  const handleSend = async () => {
-    if ((!input.trim() && !selectedFile) || isLoading) return;
+  const handleSend = async (overrideText?: string) => {
+    const textToSend = overrideText || input;
+    if ((!textToSend.trim() && !selectedFile) || isLoading) return;
     
     // Stop listening if we hit send manually
     if (isListening) {
@@ -154,7 +163,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input,
+      content: textToSend,
       attachment: selectedFile || undefined,
       timestamp: Date.now()
     };
@@ -172,7 +181,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
     try {
       // Pass activeModel to sendMessage
       const response = await orchestratorRef.current.sendMessage(
-          input, 
+          textToSend, 
           userMsg.attachment,
           (toolName, args) => {
             onToolActivity({
@@ -297,7 +306,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
                                 className="block max-w-full bg-slate-950/50 border border-slate-700 hover:border-primary-500 rounded px-2 py-1 flex items-center gap-2 transition-colors group"
                               >
                                   {source.type === 'web' ? (
-                                     <svg className="text-slate-500 group-hover:text-primary-400" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                     <svg className="text-slate-500 group-hover:text-primary-400" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
                                   ) : (
                                      <svg className="text-emerald-500 group-hover:text-emerald-400" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                                   )}
@@ -325,6 +334,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
       </div>
 
       <div className="p-4 bg-slate-950 border-t border-slate-800">
+        
+        {/* --- QUICK ACTIONS BAR --- */}
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1 no-scrollbar">
+            {QUICK_ACTIONS.map(action => (
+                <button
+                    key={action.id}
+                    onClick={() => handleSend(action.prompt)}
+                    disabled={isLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-primary-500/50 rounded-full text-xs transition-all whitespace-nowrap group disabled:opacity-50"
+                >
+                    <span className="text-sm">{action.icon}</span>
+                    <span className="text-slate-300 group-hover:text-white font-medium">{action.label}</span>
+                </button>
+            ))}
+        </div>
+
         {selectedFile && (
             <div className="mb-2 flex items-center gap-2 bg-slate-900 p-2 rounded border border-slate-700 w-fit">
                 {selectedFile.mimeType.startsWith('image/') ? (
@@ -338,6 +363,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
                     <span className="text-xs text-slate-300 font-medium max-w-[200px] truncate">{selectedFile.name}</span>
                     <span className="text-[10px] text-slate-500">{t(lang, 'chat', 'fileAttached')}</span>
                 </div>
+                {/* Visual indicator that PRO model will be used for image */}
+                <span className="ml-2 text-[10px] bg-indigo-900/50 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-700/50 font-mono">
+                    PRO MODEL
+                </span>
                 <button 
                     onClick={() => setSelectedFile(null)}
                     className="ml-2 text-slate-500 hover:text-red-400"
@@ -410,7 +439,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
             disabled={isLoading}
           />
           <button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={isLoading || (!input.trim() && !selectedFile)}
             className="absolute right-2 top-2 bottom-2 p-1.5 bg-primary-600 hover:bg-primary-500 rounded-md text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center w-10"
             title={t(lang, 'chat', 'send')}

@@ -1,4 +1,5 @@
 
+
 export enum SimulationStatus {
   PENDING = 'PENDING',
   PROCESSING = 'PROCESSING',
@@ -121,36 +122,49 @@ export type ImageSize = '1K' | '2K' | '4K';
 
 export type Language = 'ro' | 'en';
 
-// --- NEW TYPES FOR FEATURES 17-27 ---
-
-export interface FireRiskReport {
-  riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME';
-  temperature: number;
-  humidity: number;
-  windSpeed: number;
-  soilMoisture: number;
-  recommendation: string;
-}
+// --- QUICK WIN TYPES (Features 1, 4, 5, 6) ---
 
 export interface CleaningSchedule {
   parkId: string;
-  rainForecastNext3Days: number; // mm
-  soilingLevel: number; // %
-  recommendation: 'CLEAN_NOW' | 'WAIT_FOR_RAIN' | 'MONITOR';
-  estimatedCostSaved: number;
+  dustIQScore: number;
+  soilingLoss: number; // % lost generation
+  daysSinceCleaning: number;
+  rainForecast: string;
+  recommendation: 'CLEAN_NOW' | 'WAIT' | 'SKIP';
+  urgency: 'high' | 'medium' | 'low';
+  roiEstimate: number; // EUR saved
 }
 
-export interface RobotDispatch {
-  missionId: string;
-  dronesDeployed: number;
-  groundRovers: number;
-  estimatedDuration: string;
-  status: 'DISPATCHED' | 'IN_PROGRESS';
+export interface ProductionAnomaly {
+  id: string;
+  type: string;
+  equipment: string;
+  timestamp: string;
+  currentValue: number | string;
+  expectedValue: number | string;
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  message: string;
+  recommendedAction: string;
 }
 
-export interface GridStatus {
-  mode: 'GRID_TIED' | 'ISLANDING' | 'BLACKOUT_SUPPORT';
-  activePower: number;
-  batteryLevel: number;
-  localHouseholdsPowered: number;
+export interface SolarForecast {
+  time: string;
+  ghi: number; // Global Horizontal Irradiance W/m2
+  dni?: number; // Direct Normal Irradiance W/m2 (Essential for tracking)
+  dhi?: number; // Diffuse Horizontal Irradiance W/m2
+  temp: number; // Celsius
+  cloudCover: number; // %
+  productionEstimateMw: number;
+  confidence: number;
+}
+
+export interface BenchmarkData {
+  fleetId: string;
+  metric: string;
+  yourPark: number;
+  networkAvg: number;
+  topPerformer: number;
+  rank: number;
+  percentile: number;
+  status: 'ABOVE_AVG' | 'BELOW_AVG' | 'ELITE';
 }

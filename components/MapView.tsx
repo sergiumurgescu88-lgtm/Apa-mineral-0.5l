@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { Place, RoofAnnotation, ToolCallLog, Language, SolarPark } from '../types';
+import { Place, RoofAnnotation, ToolCallLog, Language, SolarPark, SolarForecast } from '../types';
 import { t } from '../translations';
 
 interface MapViewProps {
@@ -16,8 +17,11 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isListOpen, setIsListOpen] = useState(true);
   
+  // Weather State
+  const [weatherData, setWeatherData] = useState<SolarForecast | null>(null);
+
   // Dashboard Tabs State
-  const [activeTab, setActiveTab] = useState<'overview' | 'financial' | 'health'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'financial' | 'health' | 'meteo'>('overview');
 
   useEffect(() => {
     if (!activeToolLog) return;
@@ -28,6 +32,7 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
         setCurrentSolarPark(null);
         setSearchResults([]);
         setAnnotations([]); 
+        setWeatherData(null);
       }
     }
 
@@ -63,6 +68,44 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
              }, 1000);
         }
     }
+
+    // Handle Anomaly Detection Tool
+    if (activeToolLog.toolName === 'analyzeAnomalies' && activeToolLog.result) {
+        const anomalies = activeToolLog.result.anomalies || [];
+        if (currentSolarPark) {
+            const alerts = anomalies.map((a: any) => `${a.severity}: ${a.message}`);
+            const newHealth = activeToolLog.result.systemHealthScore || currentSolarPark.healthScore;
+            
+            setCurrentSolarPark(prev => prev ? ({
+                ...prev,
+                healthScore: newHealth,
+                predictionAlerts: alerts
+            }) : null);
+            
+            setActiveTab('health');
+        }
+    }
+
+    // --- NEW: Handle Solar Forecast Tool (The Weather Test) ---
+    if (activeToolLog.toolName === 'getSolarForecast' && activeToolLog.result?.forecast) {
+        const forecast = activeToolLog.result.forecast as SolarForecast;
+        setWeatherData(forecast);
+        
+        // If we don't have a place selected, create a dummy one to show the background
+        if (!currentPlace) {
+             setCurrentPlace({
+                 id: 'weather_loc',
+                 name: 'Weather Station Location',
+                 address: 'Coordinates Selection',
+                 location: { lat: 44.4, lng: 26.1 },
+                 type: 'station',
+                 imageUrl: 'https://picsum.photos/seed/weather/800/600'
+             });
+        }
+        
+        setActiveTab('meteo');
+    }
+
   }, [activeToolLog]);
 
   const handleParkSelect = (park: SolarPark) => {
@@ -73,7 +116,6 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
       setActiveTab('overview');
   };
 
-  // Helper to format currency
   const fmtEur = (val: number) => new Intl.NumberFormat('en-EU', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(val);
 
   return (
@@ -84,13 +126,13 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
             <img 
                 src={currentPlace.imageUrl} 
                 alt="Satellite View" 
-                className={`w-full h-full object-cover transition-opacity duration-700 opacity-60 ${currentSolarPark ? 'hue-rotate-15 contrast-125 saturate-50' : 'grayscale-[20%]'}`}
+                className={`w-full h-full object-cover transition-opacity duration-700 opacity-60 ${currentSolarPark || weatherData ? 'hue-rotate-15 contrast-125 saturate-50' : 'grayscale-[20%]'}`}
             />
             
             {/* --- MAP UI OVERLAYS --- */}
 
             {/* Smart Helios Digital Twin Dashboard */}
-            {currentSolarPark ? (
+            {(currentSolarPark || weatherData) ? (
                 <div className="absolute top-4 left-4 z-20 flex flex-col gap-2 animate-in fade-in slide-in-from-left-4 duration-500">
                     
                     {/* Header Card */}
@@ -104,31 +146,50 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                     </span>
                                     <span className="text-[10px] font-mono uppercase text-emerald-400 tracking-wider font-bold">Smart Helios Twin</span>
                                 </div>
-                                <h3 className="text-white font-bold text-lg leading-tight">{currentSolarPark.name.split(' (')[0]}</h3>
+                                <h3 className="text-white font-bold text-lg leading-tight">
+                                    {currentSolarPark ? currentSolarPark.name.split(' (')[0] : 'Meteo Station Alpha'}
+                                </h3>
                             </div>
                             <div className="text-right">
-                                <div className="text-2xl font-bold text-white leading-none tracking-tight">{currentSolarPark.capacityMw}</div>
-                                <div className="text-[9px] text-slate-400 font-mono uppercase">MW Capacity</div>
+                                {currentSolarPark ? (
+                                    <>
+                                        <div className="text-2xl font-bold text-white leading-none tracking-tight">{currentSolarPark.capacityMw}</div>
+                                        <div className="text-[9px] text-slate-400 font-mono uppercase">MW Capacity</div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="text-2xl font-bold text-white leading-none tracking-tight">LIVE</div>
+                                        <div className="text-[9px] text-slate-400 font-mono uppercase">Open-Meteo Stream</div>
+                                    </>
+                                )}
                             </div>
                         </div>
 
                         {/* Quick Stats Grid */}
                         <div className="grid grid-cols-2 gap-2 mt-3">
                              <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                                 <p className="text-slate-500 font-mono text-[9px] uppercase">Health Score</p>
+                                 <p className="text-slate-500 font-mono text-[9px] uppercase">
+                                     {weatherData ? 'Current Temp' : 'Health Score'}
+                                 </p>
                                  <div className="flex items-end gap-1">
-                                     <span className={`text-lg font-bold ${
-                                         (currentSolarPark.healthScore || 0) > 90 ? 'text-emerald-400' : 
-                                         (currentSolarPark.healthScore || 0) > 70 ? 'text-amber-400' : 'text-red-400'
-                                     }`}>
-                                         {currentSolarPark.healthScore || '--'}%
-                                     </span>
+                                     {weatherData ? (
+                                         <span className="text-lg font-bold text-amber-400">{weatherData.temp}°C</span>
+                                     ) : (
+                                         <span className={`text-lg font-bold transition-colors duration-500 ${
+                                             (currentSolarPark?.healthScore || 0) > 90 ? 'text-emerald-400' : 
+                                             (currentSolarPark?.healthScore || 0) > 70 ? 'text-amber-400' : 'text-red-400'
+                                         }`}>
+                                             {currentSolarPark?.healthScore || '--'}%
+                                         </span>
+                                     )}
                                  </div>
                              </div>
                              <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
-                                 <p className="text-slate-500 font-mono text-[9px] uppercase">Est. Daily Rev</p>
+                                 <p className="text-slate-500 font-mono text-[9px] uppercase">
+                                     {weatherData ? 'Solar Irradiance' : 'Est. Daily Rev'}
+                                 </p>
                                  <p className="text-lg font-bold text-white">
-                                     {currentSolarPark.dailyRevenueEur ? `€${(currentSolarPark.dailyRevenueEur / 1000).toFixed(1)}k` : '--'}
+                                     {weatherData ? `${weatherData.ghi} W/m²` : (currentSolarPark?.dailyRevenueEur ? `€${(currentSolarPark.dailyRevenueEur / 1000).toFixed(1)}k` : '--')}
                                  </p>
                              </div>
                         </div>
@@ -137,7 +198,7 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                     {/* Tabbed Detail View */}
                     <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl w-80 overflow-hidden">
                         <div className="flex border-b border-slate-700">
-                            {(['overview', 'financial', 'health'] as const).map(tab => (
+                            {(['overview', 'financial', 'health', 'meteo'] as const).map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
@@ -147,13 +208,13 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                         : 'text-slate-500 hover:text-slate-300'
                                     }`}
                                 >
-                                    {tab}
+                                    {tab.slice(0, 4)}
                                 </button>
                             ))}
                         </div>
                         
                         <div className="p-4 min-h-[140px]">
-                            {activeTab === 'overview' && (
+                            {activeTab === 'overview' && currentSolarPark && (
                                 <div className="space-y-3">
                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                                         <div>
@@ -184,7 +245,7 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                 </div>
                             )}
 
-                            {activeTab === 'financial' && (
+                            {activeTab === 'financial' && currentSolarPark && (
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between p-2 bg-slate-950/50 rounded border border-slate-700">
                                         <div className="flex flex-col">
@@ -209,7 +270,7 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                 </div>
                             )}
 
-                            {activeTab === 'health' && (
+                            {activeTab === 'health' && currentSolarPark && (
                                 <div className="space-y-2">
                                      <div className="flex justify-between items-center mb-1">
                                         <span className="text-[10px] font-mono text-slate-400 uppercase">Active Alerts</span>
@@ -231,6 +292,66 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                              </div>
                                          )}
                                      </div>
+                                </div>
+                            )}
+
+                            {/* --- NEW METEO TAB --- */}
+                            {activeTab === 'meteo' && (
+                                <div className="space-y-3">
+                                    {weatherData ? (
+                                        <>
+                                            <div className="grid grid-cols-3 gap-2 text-center">
+                                                <div className="bg-slate-950/50 p-2 rounded border border-slate-700">
+                                                    <p className="text-[9px] text-slate-400 font-mono">GHI</p>
+                                                    <p className="text-sm font-bold text-amber-300">{weatherData.ghi}</p>
+                                                    <p className="text-[8px] text-slate-500">Global</p>
+                                                </div>
+                                                <div className="bg-slate-950/50 p-2 rounded border border-emerald-500/20 shadow-inner">
+                                                    <p className="text-[9px] text-emerald-400 font-mono font-bold">DNI</p>
+                                                    <p className="text-sm font-bold text-white">{weatherData.dni || '--'}</p>
+                                                    <p className="text-[8px] text-slate-500">Direct</p>
+                                                </div>
+                                                <div className="bg-slate-950/50 p-2 rounded border border-slate-700">
+                                                    <p className="text-[9px] text-slate-400 font-mono">DHI</p>
+                                                    <p className="text-sm font-bold text-sky-300">{weatherData.dhi || '--'}</p>
+                                                    <p className="text-[8px] text-slate-500">Diffuse</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-3 bg-slate-800/50 p-2 rounded border border-slate-700">
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between text-[10px] mb-1">
+                                                        <span className="text-slate-400">Cloud Cover</span>
+                                                        <span className="text-white font-mono">{weatherData.cloudCover}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className="h-full bg-sky-500 transition-all duration-1000" 
+                                                            style={{ width: `${weatherData.cloudCover}%` }} 
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[9px] text-slate-400">Confidence</p>
+                                                    <p className="text-xs font-bold text-emerald-400">{(weatherData.confidence * 100).toFixed(0)}%</p>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-[9px] text-center text-slate-500 italic mt-1">
+                                                Data Source: Open-Meteo API (Solar Radiation)
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-8 text-slate-500 text-xs animate-pulse">
+                                            Connecting to Weather Station...
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {!currentSolarPark && activeTab !== 'meteo' && (
+                                <div className="text-center py-8 text-slate-500 text-xs">
+                                    Select a park or use the Weather tool.
                                 </div>
                             )}
                         </div>
