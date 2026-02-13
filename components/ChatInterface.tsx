@@ -15,6 +15,7 @@ interface ChatInterfaceProps {
   onToolActivity: (log: ToolCallLog) => void;
   lang: Language;
   activeModel: string;
+  onHistoryUpdate?: (messages: Message[]) => void;
 }
 
 const THINKING_MESSAGES_RO = [
@@ -35,7 +36,7 @@ const THINKING_MESSAGES_EN = [
     "Helios is now formulating the technical response..."
 ];
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, activeModel }) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, activeModel, onHistoryUpdate }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -54,18 +55,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Sync messages with parent
+  useEffect(() => {
+    if (onHistoryUpdate) onHistoryUpdate(messages);
+  }, [messages, onHistoryUpdate]);
+
   const QUICK_ACTIONS = [
     { 
         id: 'health_scan', 
-        label: lang === 'ro' ? 'Scanare Sănătate (Complet)' : 'Full Health Scan', 
+        label: lang === 'ro' ? 'Scanare Sănătate' : 'Full Health Scan', 
         icon: '🏥', 
         prompt: lang === 'ro' 
             ? 'Analizează starea de sănătate a parcului solar folosind imaginile din satelit și datele de telemetrie. Identifică indicatori cheie precum NDVI, anomalii termice și statusul operațional.' 
             : 'Analyze the health of the solar park using the provided satellite imagery and telemetry data. Identify key performance indicators like NDVI, temperature anomalies, and overall operational status.' 
     },
-    { id: 'trade_bot', label: lang === 'ro' ? 'AI Energy Trader' : 'AI Energy Trader', icon: '📈', prompt: lang === 'ro' ? 'Analizează prognoza meteo și prețurile OPCOM. Execută o strategie de tranzacționare (BUY/SELL) pentru următoarele 24h.' : 'Analyze weather forecast and OPCOM prices. Execute an energy trading strategy (BUY/SELL) for the next 24h.' },
-    { id: 'predict_fail', label: lang === 'ro' ? 'Predicție Avarii (LSTM)' : 'Predict Failures (LSTM)', icon: '🔧', prompt: lang === 'ro' ? 'Rulează modelul LSTM pentru a prezice defectarea invertoarelor sau a string-urilor în următoarele 14 zile.' : 'Run the LSTM predictive model to forecast component failures (inverters/strings) for the upcoming 14 days.' },
-    { id: 'agri_plan', label: lang === 'ro' ? 'Plan Agrivoltaic' : 'Agrivoltaics Plan', icon: '🌱', prompt: lang === 'ro' ? 'Generează un studiu de compatibilitate agrivoltaică. Ce culturi sunt potrivite aici și care este impactul umbririi?' : 'Generate an agrivoltaics compatibility study. Which crops are suitable here and what is the shading impact?' },
+    { id: 'trade_bot', label: lang === 'ro' ? 'AI Trading' : 'AI Energy Trader', icon: '📈', prompt: lang === 'ro' ? 'Analizează prognoza meteo și prețurile OPCOM. Execută o strategie de tranzacționare (BUY/SELL) pentru următoarele 24h.' : 'Analyze weather forecast and OPCOM prices. Execute an energy trading strategy (BUY/SELL) for the next 24h.' },
+    { id: 'predict_fail', label: lang === 'ro' ? 'Predicție Avarii' : 'Predict Failures', icon: '🔧', prompt: lang === 'ro' ? 'Rulează modelul LSTM pentru a prezice defectarea invertoarelor sau a string-urilor în următoarele 14 zile.' : 'Run the LSTM predictive model to forecast component failures (inverters/strings) for the upcoming 14 days.' },
+    { id: 'agri_plan', label: lang === 'ro' ? 'Plan Agrivoltaic' : 'Agrivoltaics', icon: '🌱', prompt: lang === 'ro' ? 'Generează un studiu de compatibilitate agrivoltaică. Ce culturi sunt potrivite aici și care este impactul umbririi?' : 'Generate an agrivoltaics compatibility study. Which crops are suitable here and what is the shading impact?' },
   ];
 
   useEffect(() => {
@@ -280,7 +286,7 @@ ${insights.join('\n')}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 md:space-y-6">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 md:space-y-6 custom-scrollbar">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div className={`max-w-[88%] md:max-w-[85%] rounded-lg p-3 text-sm leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-primary-600 text-white shadow-lg' : 'bg-slate-800 text-slate-200 border border-slate-700'}`}>
@@ -299,7 +305,8 @@ ${insights.join('\n')}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 md:p-4 bg-slate-950 border-t border-slate-800 shrink-0">
+      {/* Input Area - Adjusted for Mobile Navigation Safety */}
+      <div className="p-3 md:p-4 bg-slate-950 border-t border-slate-800 shrink-0 pb-[88px] md:pb-4">
         <div className="flex gap-2 mb-3 overflow-x-auto pb-1 no-scrollbar">
             {QUICK_ACTIONS.map(action => (
                 <button key={action.id} onClick={() => handleSend(action.prompt)} disabled={isLoading} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-full text-xs whitespace-nowrap text-slate-300 transition-all shrink-0">
@@ -323,7 +330,7 @@ ${insights.join('\n')}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
             disabled={isLoading} 
           />
-          <button onClick={() => handleSend()} disabled={isLoading || (!input.trim() && !selectedFile)} className="bg-primary-600 hover:bg-primary-500 px-3 md:px-4 rounded-lg text-white transition-colors shrink-0">🚀</button>
+          <button onClick={() => handleSend()} disabled={isLoading || (!input.trim() && !selectedFile)} className="bg-primary-600 hover:bg-primary-500 px-3 md:px-4 rounded-lg text-white transition-colors shrink-0 shadow-lg active:scale-95">🚀</button>
         </div>
       </div>
     </div>
