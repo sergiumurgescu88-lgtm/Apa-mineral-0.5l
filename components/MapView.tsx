@@ -92,6 +92,49 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
     return 'text-amber-400';
   };
 
+  const triggerAction = (actionId: string) => {
+      const siteName = currentSolarPark?.name || currentPlace?.name || "Unknown Site";
+      const coords = currentSolarPark?.location || currentPlace?.location;
+      
+      let prompt = "";
+      
+      switch(actionId) {
+          case 'image_gen':
+              prompt = lang === 'ro' 
+                ? `Generează o imagine fotorealistă 2K a parcului fotovoltaic ${siteName} în condiții de vreme actuală.` 
+                : `Generate a photorealistic 2K image of the solar park ${siteName} under current weather conditions.`;
+              break;
+          case 'skysat':
+              prompt = lang === 'ro' 
+                ? `Activează monitorizarea SkySat (50cm) pentru ${siteName} (${coords?.lat}, ${coords?.lng}) cu max 5% nori și benzile NIR, Red, Blue.`
+                : `Trigger SkySat (50cm) monitoring for ${siteName} (${coords?.lat}, ${coords?.lng}) with max 5% cloud cover and retrieve NIR, Red, and Blue bands.`;
+              break;
+          case 'satellite':
+              prompt = lang === 'ro' 
+                ? `Efectuează o analiză satelitară Sentinel pentru ${siteName}. Calculează indicele NDVI și raportează riscurile.` 
+                : `Perform a comprehensive satellite analysis for ${siteName}. Calculate NDVI vegetation health indices and report risks.`;
+              break;
+          case 'anomaly':
+              prompt = lang === 'ro' 
+                ? `Rulează o analiză completă de anomalii de sistem pentru ${siteName}.` 
+                : `Run a full system anomaly analysis for ${siteName}.`;
+              break;
+          case 'audit':
+               prompt = lang === 'ro' 
+                ? `Generează un raport tehnic complet (Site Report) pentru ${siteName}.` 
+                : `Generate a comprehensive technical site audit for ${siteName}.`;
+              break;
+      }
+
+      window.dispatchEvent(new CustomEvent('helios-report-trigger', { 
+          detail: { 
+              siteName: siteName,
+              actionPrompt: prompt,
+              data: { weather: weatherData, sat: satelliteData || planetData, park: currentSolarPark }
+          } 
+      }));
+  };
+
   return (
     <div className="w-full h-full relative bg-slate-950 overflow-hidden flex items-center justify-center font-sans">
       {currentPlace || currentSolarPark ? (
@@ -249,20 +292,44 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                         )}
                     </div>
 
+                    {/* ACTION GRID */}
                     <div className="px-4 pb-4">
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                            <button 
+                                onClick={() => triggerAction('image_gen')}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                                title="Generate Vision"
+                            >
+                                <span>🎨</span> Vision
+                            </button>
+                            <button 
+                                onClick={() => triggerAction('skysat')}
+                                className="bg-slate-800 hover:bg-slate-700 text-primary-400 border border-primary-500/30 p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                                title="SkySat 50cm"
+                            >
+                                <span>🌍</span> SkySat
+                            </button>
+                            <button 
+                                onClick={() => triggerAction('satellite')}
+                                className="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                                title="Sat Analysis"
+                            >
+                                <span>🛰️</span> Sat Analysis
+                            </button>
+                            <button 
+                                onClick={() => triggerAction('anomaly')}
+                                className="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                                title="Anomaly Detect"
+                            >
+                                <span>🧠</span> Anomaly
+                            </button>
+                        </div>
                         <button 
-                            className="w-full bg-primary-600 hover:bg-primary-500 text-white text-[10px] font-mono font-bold py-2.5 rounded flex items-center justify-center gap-2 group transition-all shadow-lg active:scale-95"
-                            onClick={() => {
-                                window.dispatchEvent(new CustomEvent('helios-report-trigger', { 
-                                    detail: { 
-                                        siteName: currentSolarPark?.name || currentPlace?.name,
-                                        data: { weather: weatherData, sat: satelliteData || planetData, park: currentSolarPark }
-                                    } 
-                                }));
-                            }}
+                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-mono font-bold py-2.5 rounded flex items-center justify-center gap-2 group transition-all shadow-lg active:scale-95"
+                            onClick={() => triggerAction('audit')}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:animate-bounce"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-                            GENERATE AI SITE REPORT
+                            GENERATE TECHNICAL AUDIT
                         </button>
                     </div>
                 </div>

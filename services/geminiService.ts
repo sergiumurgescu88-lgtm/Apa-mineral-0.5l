@@ -59,6 +59,128 @@ const generateSiteReportTool: FunctionDeclaration = {
     }
 };
 
+// --- OPEN-METEO WEATHER TOOLS (COMPREHENSIVE) ---
+
+const fetchWeatherForecastTool: FunctionDeclaration = {
+    name: "fetch_weather_forecast",
+    description: "Fetches comprehensive weather forecast from Open-Meteo API for up to 16 days. Includes temperature, precipitation, wind, humidity, cloud cover, and solar radiation data.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            latitude: { type: Type.NUMBER },
+            longitude: { type: Type.NUMBER },
+            hourly: { type: Type.ARRAY, items: { type: Type.STRING } },
+            daily: { type: Type.ARRAY, items: { type: Type.STRING } },
+            current: { type: Type.ARRAY, items: { type: Type.STRING } },
+            past_days: { type: Type.NUMBER, description: "Include past days data (0-92)" },
+            forecast_days: { type: Type.NUMBER, description: "Number of forecast days (0-16). Default 7." },
+            tilt: { type: Type.NUMBER, description: "Solar panel tilt angle (0-90)" },
+            azimuth: { type: Type.NUMBER, description: "Solar panel azimuth (-180 to 180)" },
+            timezone: { type: Type.STRING, description: "Timezone (e.g., 'auto', 'Europe/Bucharest')" }
+        },
+        required: ["latitude", "longitude"]
+    }
+};
+
+const fetchSolarRadiationForecastTool: FunctionDeclaration = {
+    name: "fetch_solar_radiation_forecast",
+    description: "Fetches detailed solar radiation forecast optimized for solar energy applications. Includes GHI, DNI, DHI, and tilted irradiance.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            latitude: { type: Type.NUMBER },
+            longitude: { type: Type.NUMBER },
+            tilt: { type: Type.NUMBER, default: 35 },
+            azimuth: { type: Type.NUMBER, default: 0 },
+            forecast_days: { type: Type.NUMBER, default: 7 },
+            past_days: { type: Type.NUMBER, default: 0 },
+            timezone: { type: Type.STRING, default: "auto" }
+        },
+        required: ["latitude", "longitude"]
+    }
+};
+
+const fetch15MinuteSolarDataTool: FunctionDeclaration = {
+    name: "fetch_15_minute_solar_data",
+    description: "Fetches 15-minute resolution solar radiation data for precise nowcasting. Essential for battery dispatch optimization.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            latitude: { type: Type.NUMBER },
+            longitude: { type: Type.NUMBER },
+            minutely_15: { type: Type.ARRAY, items: { type: Type.STRING }, default: ["shortwave_radiation", "direct_normal_irradiance", "global_tilted_irradiance"] },
+            forecast_minutely_15: { type: Type.NUMBER, default: 96 },
+            tilt: { type: Type.NUMBER },
+            azimuth: { type: Type.NUMBER }
+        },
+        required: ["latitude", "longitude"]
+    }
+};
+
+const fetchHistoricalWeatherTool: FunctionDeclaration = {
+    name: "fetch_historical_weather",
+    description: "Fetches historical weather data (ERA5) from 1940 to present. Critical for backtesting yield models and analyzing long-term trends.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            latitude: { type: Type.NUMBER },
+            longitude: { type: Type.NUMBER },
+            start_date: { type: Type.STRING, description: "YYYY-MM-DD" },
+            end_date: { type: Type.STRING, description: "YYYY-MM-DD" },
+            hourly: { type: Type.ARRAY, items: { type: Type.STRING } },
+            daily: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ["latitude", "longitude", "start_date", "end_date"]
+    }
+};
+
+const fetchAirQualityTool: FunctionDeclaration = {
+    name: "fetch_air_quality",
+    description: "Fetches air quality data (Dust, PM10, PM2.5, AOD). Essential for soiling loss estimation and cleaning scheduling.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            latitude: { type: Type.NUMBER },
+            longitude: { type: Type.NUMBER },
+            hourly: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING, enum: ["dust", "pm10", "pm2_5", "aerosol_optical_depth", "uv_index"] },
+                default: ["dust", "pm10"]
+            },
+            forecast_days: { type: Type.NUMBER, default: 5 }
+        },
+        required: ["latitude", "longitude"]
+    }
+};
+
+const searchLocationTool: FunctionDeclaration = {
+    name: "search_location",
+    description: "Geocoding service to find coordinates and elevation for a city or place name.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            name: { type: Type.STRING },
+            count: { type: Type.NUMBER, default: 5 }
+        },
+        required: ["name"]
+    }
+};
+
+const getElevationTool: FunctionDeclaration = {
+    name: "get_elevation",
+    description: "Get accurate digital elevation model (DEM) data for a location.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            latitude: { type: Type.NUMBER },
+            longitude: { type: Type.NUMBER }
+        },
+        required: ["latitude", "longitude"]
+    }
+};
+
+// --- SATELLITE & CORE TOOLS ---
+
 const fetchSatelliteImageryTool: FunctionDeclaration = {
   name: "fetch_satellite_imagery",
   description: "Fetch technical satellite analysis from Copernicus Data Space (Sentinel-1 SAR, Sentinel-2 Optical, Sentinel-3 Thermal). Essential for regional monitoring and broad-scale NDVI.",
@@ -78,15 +200,8 @@ const fetchSatelliteImageryTool: FunctionDeclaration = {
       },
       startDate: { type: Type.STRING, description: "Start date for imagery search (YYYY-MM-DD)." },
       endDate: { type: Type.STRING, description: "End date for imagery search (YYYY-MM-DD)." },
-      cloudCover: { 
-          type: Type.NUMBER, 
-          description: "Maximum allowed cloud cover percentage (0-100). Default is 20.",
-          default: 20
-      },
-      evalscript: { 
-        type: Type.STRING, 
-        description: "Javascript evalscript for custom pixel manipulation (e.g. NDVI or LAI calculation)." 
-      }
+      cloudCover: { type: Type.NUMBER, default: 20 },
+      evalscript: { type: Type.STRING }
     },
     required: ["bbox", "startDate", "endDate"]
   }
@@ -94,33 +209,16 @@ const fetchSatelliteImageryTool: FunctionDeclaration = {
 
 const fetchPlanetImageryTool: FunctionDeclaration = {
     name: "fetch_planet_imagery",
-    description: "Fetch ultra-high-resolution satellite imagery via Planet Labs Subscriptions API. Supports SkySat (50cm) and PlanetScope (3m). Uses the 'Clip', 'Band Math', 'Composite', and 'File Format' tools from the Planet Toolchain for advanced processing.",
+    description: "Fetch ultra-high-resolution satellite imagery via Planet Labs Subscriptions API. Supports SkySat (50cm) and PlanetScope (3m). Uses the 'Clip', 'Band Math', 'Composite', and 'File Format' tools from the Planet Toolchain.",
     parameters: {
         type: Type.OBJECT,
         properties: {
-            name: { type: Type.STRING, description: "Site name or subscription identifier." },
-            coordinates: { 
-                type: Type.ARRAY, 
-                items: { type: Type.NUMBER }, 
-                description: "Array of coordinates forming the asset boundary [lng, lat, ...]" 
-            },
-            source: { 
-                type: Type.STRING, 
-                enum: ["planetscope", "skysat"], 
-                default: "planetscope",
-                description: "Constellation source. Use 'skysat' for 0.5m resolution (precision tasks) or 'planetscope' for 3m (monitoring)."
-            },
-            startDate: { type: Type.STRING, description: "Acquisition start (YYYY-MM-DD)." },
-            cloudCover: { 
-                type: Type.NUMBER, 
-                description: "Strict cloud filtering threshold (0-100). For SkySat precision tasks, use 5% or lower.", 
-                default: 20
-            },
-            spectralBands: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING, enum: ["NIR", "Red", "Blue", "Green", "RedEdge", "Thermal"] },
-                description: "Specific bands to retrieve. For NDVI/EVI analysis, specify ['NIR', 'Red', 'Blue']."
-            }
+            name: { type: Type.STRING },
+            coordinates: { type: Type.ARRAY, items: { type: Type.NUMBER } },
+            source: { type: Type.STRING, enum: ["planetscope", "skysat"], default: "planetscope" },
+            startDate: { type: Type.STRING },
+            cloudCover: { type: Type.NUMBER, default: 20 },
+            spectralBands: { type: Type.ARRAY, items: { type: Type.STRING } }
         },
         required: ["coordinates", "startDate"]
     }
@@ -195,7 +293,7 @@ const analyzePanelDnaTool: FunctionDeclaration = {
 
 const fetchProductionForecastTool: FunctionDeclaration = {
   name: "fetch_production_forecast",
-  description: "Predictive production via Forecast.Solar technical engine.",
+  description: "Predictive production via Forecast.Solar technical engine (Backup provider).",
   parameters: {
     type: Type.OBJECT,
     properties: { lat: { type: Type.NUMBER }, lng: { type: Type.NUMBER }, dec: { type: Type.NUMBER }, az: { type: Type.NUMBER }, kwp: { type: Type.NUMBER } },
@@ -247,41 +345,47 @@ const runSimulationTool: FunctionDeclaration = {
   },
 };
 
-const fetchWeatherForecastTool: FunctionDeclaration = {
-    name: "fetch_weather_forecast",
-    description: "Fetch comprehensive meteorological data from Open-Meteo API.",
-    parameters: { type: Type.OBJECT, properties: { latitude: { type: Type.NUMBER }, longitude: { type: Type.NUMBER } }, required: ["latitude", "longitude"] }
-};
+// --- OPEN-METEO IMPLEMENTATION HELPERS ---
 
-const fetchSolarRadiationForecastTool: FunctionDeclaration = {
-    name: "fetch_solar_radiation_forecast",
-    description: "Fetch high-precision solar radiation indices (DNI, GHI, GTI) for technical yield prediction.",
-    parameters: { type: Type.OBJECT, properties: { latitude: { type: Type.NUMBER }, longitude: { type: Type.NUMBER } }, required: ["latitude", "longitude"] }
+const fetchOpenMeteo = async (baseUrl: string, params: any) => {
+    const url = new URL(baseUrl);
+    Object.keys(params).forEach(key => {
+        if (params[key] !== undefined && params[key] !== null) {
+            const val = Array.isArray(params[key]) ? params[key].join(',') : params[key];
+            url.searchParams.append(key, val);
+        }
+    });
+    const response = await fetch(url.toString());
+    if (!response.ok) throw new Error(`Open-Meteo API Error: ${response.statusText}`);
+    return await response.json();
 };
-
-// --- TECHNICAL OPEN-METEO HANDLERS ---
 
 export const fetchWeatherForecast = async (params: any) => {
-  const baseUrl = 'https://api.open-meteo.com/v1/forecast';
-  const url = new URL(baseUrl);
-  url.searchParams.append('latitude', params.latitude.toString());
-  url.searchParams.append('longitude', params.longitude.toString());
-  if (params.hourly) url.searchParams.append('hourly', Array.isArray(params.hourly) ? params.hourly.join(',') : params.hourly);
-  if (params.daily) url.searchParams.append('daily', Array.isArray(params.daily) ? params.daily.join(',') : params.daily);
-  if (params.current) url.searchParams.append('current', Array.isArray(params.current) ? params.current.join(',') : params.current);
-  if (params.minutely_15) url.searchParams.append('minutely_15', Array.isArray(params.minutely_15) ? params.minutely_15.join(',') : params.minutely_15);
-  if (params.tilt !== undefined) url.searchParams.append('tilt', params.tilt.toString());
-  if (params.azimuth !== undefined) url.searchParams.append('azimuth', params.azimuth.toString());
-  if (params.timezone) url.searchParams.append('timezone', params.timezone || 'auto');
-  if (params.forecast_days !== undefined) url.searchParams.append('forecast_days', params.forecast_days.toString());
-  
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-      const errBody = await response.json().catch(() => ({}));
-      throw new Error(`Open-Meteo Error ${response.status}: ${errBody.reason || 'Unknown error'}`);
-  }
-  return await response.json();
-}
+    // Ensure standard params
+    const p = {
+        latitude: params.latitude || params.lat,
+        longitude: params.longitude || params.lng,
+        ...params
+    };
+    return fetchOpenMeteo('https://api.open-meteo.com/v1/forecast', p);
+};
+
+const fetchHistoricalWeather = async (params: any) => {
+    return fetchOpenMeteo('https://archive-api.open-meteo.com/v1/archive', params);
+};
+
+const fetchAirQuality = async (params: any) => {
+    return fetchOpenMeteo('https://air-quality-api.open-meteo.com/v1/air-quality', params);
+};
+
+const fetchGeocoding = async (params: any) => {
+    return fetchOpenMeteo('https://geocoding-api.open-meteo.com/v1/search', params);
+};
+
+const fetchElevation = async (params: any) => {
+    return fetchOpenMeteo('https://api.open-meteo.com/v1/elevation', params);
+};
+
 
 // --- SERVICE CLASS ---
 
@@ -305,7 +409,31 @@ export class GeminiOrchestrator {
 
   async executeSpecialTool(name: string, args: any, lastImageContext?: string): Promise<any> {
      try {
-       // Gemini Technical Report Synthesis
+       // --- OPEN-METEO SUITE ---
+       if (name === 'fetch_weather_forecast') return { result: await fetchWeatherForecast(args) };
+       
+       if (name === 'fetch_solar_radiation_forecast') {
+            return { result: await fetchWeatherForecast({
+                ...args, 
+                hourly: ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "direct_normal_irradiance", "global_tilted_irradiance"],
+                current: ["cloud_cover", "shortwave_radiation"]
+            })};
+       }
+
+       if (name === 'fetch_15_minute_solar_data') {
+           return { result: await fetchWeatherForecast({
+               ...args,
+               minutely_15: args.minutely_15 || ["shortwave_radiation", "direct_normal_irradiance", "global_tilted_irradiance"]
+           })};
+       }
+
+       if (name === 'fetch_historical_weather') return { result: await fetchHistoricalWeather(args) };
+       if (name === 'fetch_air_quality') return { result: await fetchAirQuality(args) };
+       if (name === 'search_location') return { result: await fetchGeocoding(args) };
+       if (name === 'get_elevation') return { result: await fetchElevation(args) };
+
+
+       // --- CORE HELIOS TOOLS ---
        if (name === 'generate_technical_site_report') {
            const ai = new GoogleGenAI({ apiKey: this.apiKey });
            const reportResponse = await ai.models.generateContent({
@@ -367,8 +495,6 @@ export class GeminiOrchestrator {
        if (name === 'plan_agrivoltaics') return { result: await fetchJson(`/geo/agrivoltaics?location=${args.location}&cropType=${args.cropType || ''}`) };
 
        // Infrastructure Tools
-       if (name === 'fetch_weather_forecast') return { result: await fetchWeatherForecast(paramsFix(args)) };
-       if (name === 'fetch_solar_radiation_forecast') return { result: await fetchWeatherForecast({...paramsFix(args), hourly: ["shortwave_radiation", "direct_normal_irradiance", "diffuse_radiation"]}) };
        if (name === 'searchPlaces') return { result: { places: await searchPlaces(args.query) } };
        if (name === 'searchSolarParks') return { result: { parks: searchParks(args.query), count: searchParks(args.query).length } };
        if (name === 'runSimulation') return { result: await createSimulationJob(args.placeId, args.systemSizeKw) };
@@ -467,11 +593,15 @@ export class GeminiOrchestrator {
     // Attach Tools (Only for standard chat, not image gen)
     effectiveConfig.tools = [{ 
       functionDeclarations: [
+        // Open-Meteo Suite
+        fetchWeatherForecastTool, fetchSolarRadiationForecastTool, fetch15MinuteSolarDataTool,
+        fetchHistoricalWeatherTool, fetchAirQualityTool, searchLocationTool, getElevationTool,
+        
+        // Helios Core
         generateSiteReportTool, fetchPlanetImageryTool, fetchSatelliteImageryTool, 
         fetchProductionForecastTool, fetchBiodiversityReportTool, calculateCarbonImpactTool, 
         reverseGeocodeTool, searchPlacesTool, searchSolarParksTool, 
-        runSimulationTool, fetchWeatherForecastTool, fetchSolarRadiationForecastTool,
-        fetchPerformanceBenchmarkTool, analyzePredictiveFailureTool, executeEnergyTradeTool,
+        runSimulationTool, fetchPerformanceBenchmarkTool, analyzePredictiveFailureTool, executeEnergyTradeTool,
         planAgrivoltaicsTool, analyzePanelDnaTool
       ] 
     }];
@@ -599,13 +729,4 @@ export class GeminiOrchestrator {
       groundingSources: finalGroundingSources
     };
   }
-}
-
-// Utility to ensure param consistency for Open-Meteo
-function paramsFix(args: any) {
-    return {
-        latitude: args.latitude || args.lat,
-        longitude: args.longitude || args.lng,
-        ...args
-    };
 }

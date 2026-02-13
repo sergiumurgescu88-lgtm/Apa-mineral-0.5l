@@ -75,9 +75,25 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
   // Listen for report generation triggers from other components
   useEffect(() => {
     const handleReportTrigger = (e: any) => {
-        const { siteName, data } = e.detail;
-        const prompt = `Please generate a comprehensive technical site report for ${siteName}. Use the generate_technical_site_report tool with the following context: ${JSON.stringify(data)}`;
-        handleSend(prompt);
+        const { siteName, data, actionPrompt } = e.detail;
+        
+        let prompt = actionPrompt;
+        
+        // If no specific action prompt is provided, default to the Site Report generation logic
+        if (!prompt) {
+             prompt = `Please generate a comprehensive technical site report for ${siteName}. Use the generate_technical_site_report tool with the following context: ${JSON.stringify(data)}`;
+        } else {
+             // Optional: Append context if available and not already in prompt
+             if (siteName && !prompt.includes(siteName)) {
+                 prompt += ` for ${siteName}`;
+             }
+        }
+        
+        // If image generation is requested via action, we might want to set config
+        const isImageGenRequest = prompt.toLowerCase().includes('generate image') || prompt.toLowerCase().includes('imagine');
+        const config: GeminiRequestConfig = isImageGenRequest ? { isImageGen: true, imageSize: '1K' } : {};
+
+        handleSend(prompt, isImageGenRequest ? config : undefined);
     };
     window.addEventListener('helios-report-trigger', handleReportTrigger);
     return () => window.removeEventListener('helios-report-trigger', handleReportTrigger);

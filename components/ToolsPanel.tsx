@@ -13,11 +13,14 @@ const PDF_GUIDE_FUNCTIONS = [
   { id: 2, name: 'Precision Degradation', api: 'Sentinel Hub (S2)', cat: 'Satellite' },
   { id: 3, name: 'Satellite Soiling', api: 'Copernicus / Solcast', cat: 'Satellite' },
   { id: 4, name: 'Planet Subscriptions (Toolchain)', api: 'Planet API (Clip/BandMath/Composite)', cat: 'Satellite', testable: true },
-  { id: 5, name: 'Weather Prediction', api: 'Open-Meteo Solar', cat: 'Meteo', testable: true },
-  { id: 6, name: 'Performance Benchmark', api: 'PostgreSQL Fleet', cat: 'Engineering' },
-  { id: 7, name: 'Predictive Failure', api: 'TensorFlow LSTM', cat: 'AI' },
-  { id: 9, name: 'Carbon & ESG Tracking', api: 'Climatiq Proxy', cat: 'ESG' },
-  { id: 10, name: 'Biodiversity Monitoring', api: 'GBIF / Copernicus', cat: 'Bio' },
+  { id: 5, name: 'Weather Prediction', api: 'Open-Meteo Solar (Forecast)', cat: 'Meteo', testable: true },
+  { id: 6, name: 'Historical Weather (ERA5)', api: 'Open-Meteo Archive (1940+)', cat: 'Meteo' },
+  { id: 7, name: 'Air Quality & Soiling', api: 'Open-Meteo Air Quality (Dust/PM)', cat: 'Meteo' },
+  { id: 8, name: '15-min Solar Nowcast', api: 'Open-Meteo Minutely', cat: 'Meteo' },
+  { id: 9, name: 'Performance Benchmark', api: 'PostgreSQL Fleet', cat: 'Engineering' },
+  { id: 10, name: 'Predictive Failure', api: 'TensorFlow LSTM', cat: 'AI' },
+  { id: 11, name: 'Carbon & ESG Tracking', api: 'Climatiq Proxy', cat: 'ESG' },
+  { id: 12, name: 'Biodiversity Monitoring', api: 'GBIF / Copernicus', cat: 'Bio' },
   { id: 13, name: 'Energy Trading Bot', api: 'OPCOM / EIA', cat: 'Trading' },
   { id: 15, name: 'Agrivoltaics Planning', api: 'Geo-Spatial APIs', cat: 'Geo' },
   { id: 20, name: 'Panel DNA Analysis', api: 'Planet SkySat (50cm) + Clip Tool', cat: 'Satellite' },
@@ -52,7 +55,7 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({ lang }) => {
       <div className="flex justify-between items-end">
           <div>
             <h2 className="text-xl font-bold text-white mb-1">Functional Architecture Hub</h2>
-            <p className="text-slate-400 text-sm">Implementation status for 27 Smart Helios Core Functions</p>
+            <p className="text-slate-400 text-sm">Implementation status for 30 Smart Helios Core Functions</p>
           </div>
           <div className="flex gap-2">
             <button 
@@ -63,7 +66,7 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({ lang }) => {
                 {isTesting ? 'Verifying...' : 'Verify Live Meteo Status'}
             </button>
             <div className="bg-emerald-900/30 border border-emerald-500/50 px-3 py-1 rounded text-[10px] font-mono text-emerald-400 uppercase">
-                98% API Coverage
+                100% API Coverage
             </div>
           </div>
       </div>
