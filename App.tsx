@@ -35,8 +35,8 @@ export default function App() {
         
         <header className="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">H</div>
-            <h1 className="font-semibold tracking-tight text-white">{t(lang, 'app', 'title')} <span className="text-slate-500 font-normal">{t(lang, 'app', 'subtitle')}</span></h1>
+            <div className="w-8 h-8 rounded bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">H</div>
+            <h1 className="font-semibold tracking-tight text-white">...say hello to Helios :)</h1>
           </div>
           <div className="flex gap-4 items-center">
              

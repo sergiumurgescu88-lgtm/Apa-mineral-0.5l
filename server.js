@@ -1,6 +1,7 @@
 
 /**
  * Helios Backend - PVsystCLI Automation & Digital Twin Server
+ * Now includes Planet Insights API & AI Modules Integration
  */
 
 const express = require('express');
@@ -55,136 +56,64 @@ app.post('/api/satellite/planet', async (req, res) => {
     console.log(`[Planet API] Account ID: ${PLANET_ACCOUNT_ID}`);
     console.log(`[Planet API] Initializing ${source === 'skysat' ? '0.5m SkySat' : '3.0m PlanetScope'} Subscription for: ${name || 'Strategic Asset'}`);
 
-    // --- PLANET SUBSCRIPTIONS API TOOLCHAIN CONSTRUCTION ---
-    // We strictly follow the tools defined in: https://docs.planet.com/develop/apis/subscriptions/tools/
-    
     const tools = [];
 
     // 1. CLIP TOOL
-    // Clips the imagery to the Area of Interest (AOI) to save processing credits and bandwidth.
     if (coordinates) {
         tools.push({
             type: "clip",
             parameters: { 
                 aoi: { 
                     type: "Polygon", 
-                    coordinates: [coordinates] // Expecting array of [lng, lat] arrays
-                } 
-            }
-        });
-    } else {
-        // Default AOI for demo (Bucharest area) if none provided
-        tools.push({
-            type: "clip",
-            parameters: { 
-                aoi: { 
-                    type: "Polygon", 
-                    coordinates: [[[26.1, 44.4], [26.2, 44.4], [26.2, 44.5], [26.1, 44.5], [26.1, 44.4]]] 
+                    coordinates: [coordinates] 
                 } 
             }
         });
     }
 
-    // 2. BAND MATH TOOL (Optional)
-    // Used for on-the-fly index calculation (NDVI, EVI) to reduce data volume.
-    // Documentation: https://docs.planet.com/develop/apis/subscriptions/tools/#band_math
+    // 2. BAND MATH TOOL (NDVI/EVI Calculation)
     if (spectralBands && spectralBands.length > 0) {
         const bandsConfig = [];
-        
         if (spectralBands.includes('NIR') && spectralBands.includes('Red')) {
-             bandsConfig.push({ name: "NDVI", expression: "(b4 - b3) / (b4 + b3)" }); // Assuming 4-band PlanetScope (b4=NIR, b3=Red)
+             bandsConfig.push({ name: "NDVI", expression: "(b4 - b3) / (b4 + b3)" });
         }
-        
         if (spectralBands.includes('Blue')) {
-             bandsConfig.push({ name: "EVI", expression: "2.5 * ((b4 - b3) / (b4 + 6 * b3 - 7.5 * b2 + 1))" }); // b2=Blue
+             bandsConfig.push({ name: "EVI", expression: "2.5 * ((b4 - b3) / (b4 + 6 * b3 - 7.5 * b2 + 1))" });
         }
-
         if (bandsConfig.length > 0) {
             tools.push({
                 type: "band_math",
-                parameters: {
-                    pixel_type: "32R", // 32-bit Float for indices
-                    bands: bandsConfig
-                }
+                parameters: { pixel_type: "32R", bands: bandsConfig }
             });
         }
     }
 
     // 3. COMPOSITE TOOL
-    // Used to stitch multiple scenes together or remove clouds over a time window.
-    // Documentation: https://docs.planet.com/develop/apis/subscriptions/tools/#composite
     if (cloudCover && cloudCover < 10) {
         tools.push({
             type: "composite",
-            parameters: { 
-                method: "medoid" // Effective for cloud removal in time-series
-            }
+            parameters: { method: "medoid" }
         });
     }
 
-    // 4. REPROJECT TOOL
-    // Ensures output is in a standard web-friendly projection if needed (e.g., EPSG:3857 for Web Maps)
-    // Documentation: https://docs.planet.com/develop/apis/subscriptions/tools/#reproject
-    tools.push({
-        type: "reproject",
-        parameters: {
-            projection: "EPSG:4326", // Standard Lat/Lng
-            kernel: "cubic"
-        }
-    });
+    // 4. FILE FORMAT TOOL
+    tools.push({ type: "file_format", parameters: { format: "COG" } });
 
-    // 5. FILE FORMAT TOOL
-    // Ensures output is Cloud-Optimized GeoTIFF (COG) for streaming.
-    // Documentation: https://docs.planet.com/develop/apis/subscriptions/tools/#file_format
-    tools.push({
-        type: "file_format",
-        parameters: {
-            format: "COG"
-        }
-    });
-
-    const planetRequestPayload = {
-        name: name || "Smart Helios Monitoring",
-        source_type: "publishing",
-        source_config: {
-            type: "daily_revisit",
-            item_types: source === 'skysat' ? ["SkySatScene"] : ["PSScene"],
-            asset_types: ["ortho_analytic_4b_sr"] // Surface Reflectance
-        },
-        tools: tools, // The constructed toolchain
-        delivery: { 
-            type: "google_cloud_storage", 
-            parameters: { bucket: "helios-bucket", credentials: "<GCP_CREDENTIALS>" } 
-        }
-    };
-    
-    console.log(`[Planet API] Generated Tool Chain Payload:`, JSON.stringify(planetRequestPayload, null, 2));
-
-    // --- SIMULATED RESPONSE GENERATION ---
-    // In a real app, we would POST to https://api.planet.com/subscriptions/v1/ and return the ID.
-    // Here we simulate the data that would be returned after the toolchain processes the data.
-
-    // Simulate spectral band reflectance values (0.0 - 1.0)
-    const nir = 0.35 + (Math.random() * 0.15); // Near-Infrared
-    const red = 0.05 + (Math.random() * 0.05); // Red
-    const blue = 0.02 + (Math.random() * 0.04); // Blue
-
-    // Calculate indices based on simulated values
+    // Simulate response based on toolchain processing
+    const nir = 0.35 + (Math.random() * 0.15); 
+    const red = 0.05 + (Math.random() * 0.05);
+    const blue = 0.02 + (Math.random() * 0.04);
     const ndvi = (nir - red) / (nir + red);
     const evi = 2.5 * ((nir - red) / (nir + 6 * red - 7.5 * blue + 1));
-
     const subId = `sub_${Date.now()}`;
     
     res.json({
         id: subId,
         status: 'active',
         created: new Date().toISOString(),
-        updated: new Date().toISOString(),
         name: name || `Premium_Monitoring_${subId.slice(0, 8)}`,
         source: source === 'skysat' ? 'SkySat (50cm Technical)' : 'PlanetScope (3.0m Daily)',
         resolution: source === 'skysat' ? '0.5m' : '3.0m',
-        
-        // Calculated Indices
         ndvi_mean: parseFloat(ndvi.toFixed(4)),
         evi_mean: parseFloat(evi.toFixed(4)),
         spectral_metrics: {
@@ -192,128 +121,157 @@ app.post('/api/satellite/planet', async (req, res) => {
             red_mean: parseFloat(red.toFixed(4)),
             blue_mean: parseFloat(blue.toFixed(4))
         },
-
         visualUrl: `https://picsum.photos/seed/planet_highres_${subId}/1600/1200`,
-        links: [
-            { rel: "self", href: `https://api.planet.com/subscriptions/v1/${subId}` },
-            { rel: "payload", href: `https://api.planet.com/subscriptions/v1/${subId}/results` }
-        ],
         metadata: {
             item_types: source === 'skysat' ? ["SkySatScene"] : ["PSScene"],
-            tools_used: tools.map(t => t.type), // Return the list of used tools for verification
-            cadence: "daily_revisit",
-            last_acquisition: new Date().toISOString(),
+            tools_used: tools.map(t => t.type),
             cloud_cover: cloudCover ? `${Math.min(cloudCover, (Math.random() * cloudCover)).toFixed(2)}%` : `${(Math.random() * 2).toFixed(2)}%`,
         }
     });
 });
 
-// Copernicus Data Space Ecosystem (Sentinel Hub)
-app.post('/api/satellite/imagery', async (req, res) => {
-    const { bbox, collection = 'SENTINEL2', startDate, endDate, cloudCover, evalscript } = req.body;
-    
-    console.log(`[Copernicus Hub] Technical Request: ${collection}`);
-    
-    let ndviValue = 0.35;
-    let soilingRisk = "Low";
-    let analysisType = "Sentinel Standard Monitoring";
-    
-    if (evalscript && evalscript.toLowerCase().includes('ndvi')) {
-        analysisType = "NDVI Vegetation Health Index";
-        ndviValue = 0.58; 
-    }
-    
-    // Check if analyzing the Livada area
-    const isLivada = bbox && bbox[1] > 47.6 && bbox[1] < 47.9;
-    if (isLivada) {
-        ndviValue = 0.62; 
-        soilingRisk = "Moderate (14.2%) - Accumulation detected in Sector B (North-West)";
-    }
-
-    res.json({
-        status: 'success',
-        provider: 'Copernicus Data Space Ecosystem',
-        api: 'Sentinel Hub / openEO Proxy',
-        metadata: {
-            collection,
-            processingType: analysisType,
-            resolution: collection.includes('SENTINEL2') ? '10m' : (collection.includes('SENTINEL1') ? '20m' : '60m'),
-            cloudCover: cloudCover ? `${(Math.random() * cloudCover).toFixed(2)}%` : '0.8%',
-            acquisitionDate: startDate
-        },
-        analysis: {
-            ndvi: ndviValue, 
-            evi: (ndviValue * 0.88).toFixed(2),
-            soilingEstimate: soilingRisk,
-            thermalAnomalies: collection === 'SENTINEL3' ? ['Inverter Station 4: Localized heat spike (+4.5°C)'] : [],
-            groundStability: collection === 'SENTINEL1' ? 'Stable (-0.8mm displacement)' : 'N/A'
-        },
-        visualUrl: `https://picsum.photos/seed/copernicus_${collection}_${isLivada ? 'livada' : 'global'}/1280/960`,
-        timestamp: new Date().toISOString()
-    });
-});
-
 // =========================================================================
-// === HELIOS ANALYTICS & TOOLS (NEW) ===
+// === HELIOS ANALYTICS & TOOLS (IMPLEMENTATION OF PDF ARCHITECTURE) ===
 // =========================================================================
 
-// Tool 6: Performance Benchmark
-app.get('/api/analytics/benchmark', (req, res) => {
-    const { parkId, region } = req.query;
-    res.json({
-        parkId,
-        region: region || "Romania-West",
-        metrics: {
-            pr: 84.5, // Performance Ratio
-            specific_yield: 1350, // kWh/kWp
-            availability: 99.2
-        },
-        comparison: {
-            regional_avg_pr: 81.2,
-            top_performer_pr: 88.0,
-            rank: "Top 15%"
-        },
-        insights: [
-            "Asset performing 3.3% above regional average.",
-            "Inverter efficiency trails top performers by 1.1%."
-        ]
-    });
-});
-
-// Tool 7: Predictive Failure (TensorFlow LSTM Mock)
+// --- 4.1 Anomaly Detector (Mocking ai_modules/anomaly_detector.py) ---
 app.post('/api/analytics/failure-prediction', (req, res) => {
     const { parkId, horizonDays } = req.body;
+    
+    // Simulate Isolation Forest & LSTM Results
+    // Features: NDVI, Temp, Production
+    const isAnomaly = Math.random() > 0.7;
+    const severity = isAnomaly ? (Math.random() > 0.5 ? "high" : "medium") : "low";
+    
+    const predictions = [
+        { 
+            component: "Inverter_Block_B2", 
+            probability: isAnomaly ? 0.82 : 0.05, 
+            est_failure: isAnomaly ? "72h" : "N/A", 
+            impact: isAnomaly ? "High (2.1 MW)" : "None" 
+        },
+        { 
+            component: "String_Box_14", 
+            probability: 0.45, 
+            est_failure: "14d", 
+            impact: "Low (0.1 MW)" 
+        }
+    ];
+
     res.json({
-        model: "TensorFlow-LSTM-v4",
+        model: "Helios-LSTM-v4 (IsolationForest Ensemble)",
+        parkId: parkId,
         status: "Inference Complete",
-        predictions: [
-            { component: "Inverter_Block_B2", probability: 0.82, est_failure: "72h", impact: "High (2.1 MW)" },
-            { component: "String_Box_14", probability: 0.45, est_failure: "14d", impact: "Low (0.1 MW)" }
-        ],
-        maintenance_recommendation: "Schedule preventative check for Inverter B2 within 48h."
+        anomaly_detected: isAnomaly,
+        severity: severity,
+        predictions: predictions,
+        maintenance_recommendation: isAnomaly 
+            ? "Schedule preventative check for Inverter B2 within 48h based on thermal variance." 
+            : "System operating within normal parameters."
     });
 });
 
-// Tool 13: Energy Trading Bot (OPCOM Simulator)
+// --- 4.2 Trading Optimizer (Mocking ai_modules/trading_optimizer.py) ---
 app.post('/api/market/trade', (req, res) => {
     const { action, volumeMwh, priceLimit } = req.body;
-    const executedPrice = 110 + (Math.random() * 20); // EUR/MWh
+    
+    // Simulate OPCOM Day-Ahead Logic
+    const marketPrice = 110 + (Math.random() * 20); // EUR/MWh
+    const isExecuted = priceLimit ? (action === 'BUY' ? marketPrice <= priceLimit : marketPrice >= priceLimit) : true;
+    
     res.json({
         exchange: "OPCOM Day-Ahead",
-        status: "Executed",
+        status: isExecuted ? "Executed" : "Pending Limit",
         ticket_id: `TRD-${Date.now()}`,
         details: {
             action,
             volume: volumeMwh,
-            limit: priceLimit,
-            executed_price_eur: executedPrice.toFixed(2),
-            total_value_eur: (executedPrice * volumeMwh).toFixed(2)
+            limit: priceLimit || "Market",
+            executed_price_eur: isExecuted ? marketPrice.toFixed(2) : null,
+            total_value_eur: isExecuted ? (marketPrice * volumeMwh).toFixed(2) : 0,
+            confidence_score: 0.92 // From TradingOptimizer confidence logic
+        },
+        ai_analysis: {
+            forecast_adjusted: volumeMwh * 1.02,
+            temp_loss_pct: 1.2,
+            soiling_loss_pct: 0.8
         },
         timestamp: new Date().toISOString()
     });
 });
 
-// Tool 15: Agrivoltaics Planning
+// --- 3.5 Forest Carbon Monitoring (Mocking services/forest_carbon.py) ---
+app.post('/api/esg/carbon-impact', (req, res) => {
+    const { mwh, geometry } = req.body;
+    
+    // Constants from PDF
+    const emissionFactor = 250.0; // g CO2/kWh
+    const avoidedKg = mwh * emissionFactor;
+    
+    // Simulate Biomass calculation if geometry provided
+    const biomassTonnes = geometry ? (Math.random() * 50 + 10).toFixed(1) : 0;
+    
+    res.json({
+        status: 'success',
+        metrics: {
+            avoidedTonnes: (avoidedKg / 1000).toFixed(2),
+            treesEquivalent: Math.round(avoidedKg / 20),
+            biomass_stock_tonnes: biomassTonnes,
+            canopy_height_m: 12.5,
+            biodiversity_index: 85.4
+        },
+        compliance: {
+            net_loss: "0%",
+            status: "Compliant"
+        },
+        methodology: "Climatiq RO-specific Factor + Planet Forest Carbon"
+    });
+});
+
+// --- 3.3 Land Surface Temperature (LST) Monitor ---
+app.get('/api/monitoring/thermal/status/:parkId', (req, res) => {
+    const { parkId } = req.params;
+    
+    // Simulate LST Data (01:30 and 13:30 passes)
+    const tempCelsius = 25 + (Math.random() * 15);
+    const hasHotSpot = Math.random() > 0.8;
+    
+    res.json({
+        park_id: parkId,
+        current_temp_celsius: tempCelsius.toFixed(1),
+        has_hot_spots: hasHotSpot,
+        hot_spot_count: hasHotSpot ? Math.floor(Math.random() * 5) + 1 : 0,
+        thermal_data: Array.from({length: 24}, (_, i) => ({
+            hour: i,
+            temp: (tempCelsius - 10 + Math.random() * 5).toFixed(1)
+        })),
+        recommendation: hasHotSpot ? "Trigger Tasking API for SkySat Inspection" : "Normal Operation"
+    });
+});
+
+// --- 3.2 Statistical API (NDVI Timeseries) ---
+app.get('/api/monitoring/ndvi/timeseries/:parkId', (req, res) => {
+    const { parkId } = req.params;
+    
+    // Simulate 30 days of NDVI data
+    const data = Array.from({length: 30}, (_, i) => {
+        const date = new Date();
+        date.setDate(date.getDate() - (29 - i));
+        return {
+            date: date.toISOString().split('T')[0],
+            mean_ndvi: 0.4 + (Math.random() * 0.3),
+            std_ndvi: 0.05 + (Math.random() * 0.02)
+        };
+    });
+
+    res.json({
+        park_id: parkId,
+        data: data,
+        current_health_index: (data[29].mean_ndvi * 100).toFixed(1)
+    });
+});
+
+// --- Agrivoltaics Planning ---
 app.get('/api/geo/agrivoltaics', (req, res) => {
     const { location, cropType } = req.query;
     res.json({
@@ -335,7 +293,8 @@ app.get('/api/geo/agrivoltaics', (req, res) => {
     });
 });
 
-// ============= EXISTING APIS =============
+
+// ============= EXISTING HELPERS =============
 
 app.get('/api/solar/forecast', async (req, res) => {
     const { lat, lng, dec = 35, az = 0, kwp = 1 } = req.query;
@@ -361,19 +320,6 @@ app.get('/api/biodiversity/nearby', async (req, res) => {
     }
 });
 
-app.post('/api/esg/carbon-impact', async (req, res) => {
-    const { mwh } = req.body;
-    const emissionFactor = 250.0; 
-    const avoidedKg = mwh * emissionFactor;
-    res.json({
-        status: 'success',
-        avoidedTonnes: (avoidedKg / 1000).toFixed(2),
-        treesEquivalent: Math.round(avoidedKg / 20),
-        roGridIntensity: "250g CO2/kWh",
-        methodology: "Climatiq RO-specific Factor"
-    });
-});
-
 app.get('/api/geo/reverse', async (req, res) => {
     const { lat, lng } = req.query;
     try {
@@ -385,6 +331,23 @@ app.get('/api/geo/reverse', async (req, res) => {
         res.status(500).json({ error: "Reverse Geocoding failed" });
     }
 });
+
+app.get('/api/satellite/imagery', async (req, res) => {
+    const { collection } = req.query; 
+    // Legacy endpoint support
+    res.json({ status: 'success', message: 'Use POST /api/satellite/planet for advanced imagery' });
+});
+
+app.get('/api/analytics/benchmark', (req, res) => {
+    const { parkId, region } = req.query;
+    res.json({
+        parkId,
+        region: region || "Romania-West",
+        metrics: { pr: 84.5, specific_yield: 1350, availability: 99.2 },
+        comparison: { regional_avg_pr: 81.2, top_performer_pr: 88.0, rank: "Top 15%" }
+    });
+});
+
 
 // PVsyst Endpoints
 app.post('/api/config', (req, res) => {

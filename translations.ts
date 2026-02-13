@@ -26,7 +26,7 @@ export const translations = {
       testPrompt: "Rulează Test Sistem"
     },
     chat: {
-      welcome: "Salut. Sunt Smart Helios, Arhitect Digital cu Doctorat în R&D. Monitorizez 28 de parcuri în timp real cu cele 27 de module AI avansate. Am integrat recent accesul la sateliții Planet Labs (rezoluție 3m), calculul amprentei de Carbon (ESG) și monitorizarea biodiversității. Cum pot optimiza portofoliul tău astăzi? (Poți întreba despre anomalii termice, trading, agrivoltaice sau PPA-uri)",
+      welcome: "Salut. Sunt Helios, Arhitect Digital cu Doctorat în R&D. Monitorizez 6 parcuri din România în timp real și 50 parcuri strategice din SUA cu cele 27 de module AI avansate. Am integrat recent accesul la sateliții Planet Labs (rezoluție 3m), calculul amprentei de Carbon (ESG) și monitorizarea biodiversității. Cum pot optimiza portofoliul tău astăzi? (Poți întreba despre anomalii termice, trading, agrivoltaice sau PPA-uri)",
       agentName: "Helios",
       imageAttached: "Imagine atașată",
       fileAttached: "Fișier atașat",
@@ -117,7 +117,7 @@ export const translations = {
       testPrompt: "Run System Stack Test"
     },
     chat: {
-      welcome: "Hello. I am Smart Helios, a Digital Architect with a PhD in R&D. I am monitoring 28 parks in real-time with my 27 advanced AI modules. I recently integrated access to Planet Labs satellites (3m resolution), Carbon Footprint calculation (ESG), and Biodiversity monitoring. How can I optimize your portfolio today? (Ask about thermal anomalies, trading, agrivoltaics or PPAs)",
+      welcome: "Hello. I am Helios, a Digital Architect with a PhD in R&D. I am monitoring 6 parks in Romania and 50 strategic US assets in real-time with my 27 advanced AI modules. I recently integrated access to Planet Labs satellites (3m resolution), Carbon Footprint calculation (ESG), and Biodiversity monitoring. How can I optimize your portfolio today? (Ask about thermal anomalies, trading, agrivoltaics or PPAs)",
       agentName: "Helios",
       imageAttached: "Image attached",
       fileAttached: "File attached",

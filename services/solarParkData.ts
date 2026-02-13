@@ -1,7 +1,8 @@
 
 import { SolarPark } from '../types';
 
-export const ROMANIAN_SOLAR_PARKS: SolarPark[] = [
+export const GLOBAL_SOLAR_PARKS: SolarPark[] = [
+  // --- ROMANIA PORTFOLIO ---
   {
     id: 'ro_pv_021',
     name: 'Arad Mega Solar Park (Europe\'s Largest)',
@@ -85,46 +86,66 @@ export const ROMANIAN_SOLAR_PARKS: SolarPark[] = [
     panelsCount: 332000,
     co2AvoidedTons: 50000
   },
-  {
-    id: 'ro_pv_009',
-    name: 'Tenaris Călărași',
-    county: 'Călărași',
-    region: 'Sud-Muntenia',
-    capacityMw: 20,
-    operator: 'Tenaris Romania',
-    commissionedDate: '2025-01',
-    status: 'Operational',
-    location: { lat: 44.2, lng: 27.33 },
-    technicalDetails: 'Industrial self-consumption facility for steel manufacturing. $21.5M investment.',
-    healthScore: 97,
-    dailyRevenueEur: 8000,
-    panelsCount: 45000
-  },
-  {
-    id: 'ro_pv_010',
-    name: 'Saint-Gobain Călărași',
-    county: 'Călărași',
-    region: 'Sud-Muntenia',
-    capacityMw: 8.6,
-    operator: 'Engie / Saint-Gobain',
-    commissionedDate: '2022',
-    status: 'Operational',
-    location: { lat: 44.2, lng: 27.33 },
-    technicalDetails: 'First and largest pure self-consumption project in Romania. Covers 20% of factory needs.',
-    healthScore: 99,
-    dailyRevenueEur: 3500,
-    panelsCount: 18000
-  }
+  // --- USA STRATEGIC PORTFOLIO ---
+  { id: 'US001', name: 'Desert Sunlight Solar Farm', county: 'California', region: 'Riverside County, Desert Center', capacityMw: 550, operator: 'NextEra Energy / GE / Sumitomo', commissionedDate: '2015', status: 'Operational', location: { lat: 33.8667, lng: -115.4 }, healthScore: 92, dailyRevenueEur: 220000, panelsCount: 8000000, co2AvoidedTons: 300000, technicalDetails: 'CdTe thin-film + storage. Focus: thin-film degradation, high-temp.' },
+  { id: 'US002', name: 'FPL Manatee Energy Storage', county: 'Florida', region: 'Manatee County', capacityMw: 409, operator: 'NextEra Energy (FPL)', commissionedDate: '2021', status: 'Operational', location: { lat: 27.45, lng: -82.4 }, healthScore: 98, dailyRevenueEur: 180000, panelsCount: 1200000, co2AvoidedTons: 210000, technicalDetails: 'Solar + 900MW/2.4GWh battery. Focus: battery optimization, grid balancing.' },
+  { id: 'US003', name: 'FPL Babcock Ranch Solar', county: 'Florida', region: 'Charlotte County', capacityMw: 75, operator: 'NextEra Energy (FPL)', commissionedDate: '2018', status: 'Operational', location: { lat: 26.8, lng: -81.7 }, healthScore: 88, dailyRevenueEur: 30000, panelsCount: 300000, co2AvoidedTons: 40000, technicalDetails: 'Single-axis tracking. Focus: hurricane resilience.' },
+  { id: 'US004', name: 'FPL DeSoto Next Generation', county: 'Florida', region: 'DeSoto County', capacityMw: 25, operator: 'NextEra Energy (FPL)', commissionedDate: '2009', status: 'Operational', location: { lat: 27.2, lng: -81.8 }, healthScore: 75, dailyRevenueEur: 10000, panelsCount: 90000, co2AvoidedTons: 15000, technicalDetails: 'Fixed-tilt. Focus: aging asset analysis, repowering.' },
+  { id: 'US005', name: 'Genesis Solar Energy', county: 'California', region: 'Riverside County, Blythe', capacityMw: 250, operator: 'NextEra Energy', commissionedDate: '2014', status: 'Operational', location: { lat: 33.6667, lng: -114.9 }, healthScore: 85, dailyRevenueEur: 100000, panelsCount: 0, co2AvoidedTons: 140000, technicalDetails: 'CSP parabolic trough. Focus: CSP monitoring, thermal storage.' },
+  { id: 'US006', name: 'Marshall Solar', county: 'Minnesota', region: 'Lincoln County', capacityMw: 62, operator: 'NextEra Energy Resources', commissionedDate: '2017', status: 'Operational', location: { lat: 44.45, lng: -96.2 }, healthScore: 82, dailyRevenueEur: 24000, panelsCount: 200000, co2AvoidedTons: 35000, technicalDetails: 'Fixed-tilt PV. Focus: snow load, cold-weather performance.' },
+  { id: 'US007', name: 'Point Beach Solar', county: 'Wisconsin', region: 'Two Rivers', capacityMw: 100, operator: 'NextEra Energy Resources', commissionedDate: '2021', status: 'Operational', location: { lat: 44.2833, lng: -87.5333 }, healthScore: 90, dailyRevenueEur: 40000, panelsCount: 315000, co2AvoidedTons: 55000, technicalDetails: 'Single-axis tracking. Focus: Great Lakes climate.' },
+  { id: 'US008', name: 'Stuttgart Solar', county: 'Arkansas', region: 'Arkansas County', capacityMw: 81, operator: 'NextEra Energy Resources', commissionedDate: '2018', status: 'Operational', location: { lat: 34.5, lng: -91.55 }, healthScore: 86, dailyRevenueEur: 32000, panelsCount: 250000, co2AvoidedTons: 42000, technicalDetails: 'Fixed-tilt. Focus: agricultural integration, agrivoltaic.' },
+  { id: 'US009', name: 'Farmington Solar', county: 'New York', region: 'Franklin County', capacityMw: 19.6, operator: 'NextEra Energy Resources', commissionedDate: '2018', status: 'Operational', location: { lat: 44.68, lng: -74.6 }, healthScore: 84, dailyRevenueEur: 8000, panelsCount: 60000, co2AvoidedTons: 11000, technicalDetails: 'Fixed-tilt. Focus: northeast winter.' },
+  { id: 'US010', name: 'Coolidge Solar', county: 'Vermont', region: 'Windsor County', capacityMw: 19.6, operator: 'NextEra Energy Resources', commissionedDate: '2018', status: 'Operational', location: { lat: 43.65, lng: -72.65 }, healthScore: 85, dailyRevenueEur: 8000, panelsCount: 60000, co2AvoidedTons: 11000, technicalDetails: 'Fixed-tilt. Focus: Vermont compliance.' },
+  { id: 'US011', name: 'Topaz Solar Farm', county: 'California', region: 'San Luis Obispo County', capacityMw: 550, operator: 'BHE Renewables (Berkshire)', commissionedDate: '2014', status: 'Operational', location: { lat: 35.3833, lng: -120.0667 }, healthScore: 89, dailyRevenueEur: 220000, panelsCount: 8900000, co2AvoidedTons: 300000, technicalDetails: 'CdTe thin-film. Focus: thin-film degradation, coastal fog.' },
+  { id: 'US012', name: 'Solar Star 1', county: 'California', region: 'Kern County, Rosamond', capacityMw: 318, operator: 'BHE Renewables', commissionedDate: '2015', status: 'Operational', location: { lat: 34.9, lng: -118.3 }, healthScore: 91, dailyRevenueEur: 127000, panelsCount: 1720000, co2AvoidedTons: 175000, technicalDetails: 'Single-axis tracking. Focus: large-scale tracking coordination.' },
+  { id: 'US013', name: 'Solar Star 2', county: 'California', region: 'Los Angeles County', capacityMw: 261, operator: 'BHE Renewables', commissionedDate: '2015', status: 'Operational', location: { lat: 34.95, lng: -118.25 }, healthScore: 91, dailyRevenueEur: 104000, panelsCount: 1300000, co2AvoidedTons: 145000 },
+  { id: 'US014', name: 'Copper Mountain Solar 1', county: 'Nevada', region: 'Boulder City', capacityMw: 58, operator: 'BHE Renewables / Sempra', commissionedDate: '2010', status: 'Operational', location: { lat: 35.8167, lng: -114.9833 }, healthScore: 78, dailyRevenueEur: 23000, panelsCount: 775000, co2AvoidedTons: 32000, technicalDetails: '14+ years asset, inverter retrofits.' },
+  { id: 'US015', name: 'Copper Mountain Solar 2', county: 'Nevada', region: 'Boulder City', capacityMw: 150, operator: 'BHE Renewables / Sempra', commissionedDate: '2012', status: 'Operational', location: { lat: 35.81, lng: -114.98 }, healthScore: 82, dailyRevenueEur: 60000, panelsCount: 1500000, co2AvoidedTons: 85000 },
+  { id: 'US016', name: 'Copper Mountain Solar 3', county: 'Nevada', region: 'Boulder City', capacityMw: 250, operator: 'BHE Renewables / Sempra', commissionedDate: '2015', status: 'Operational', location: { lat: 35.82, lng: -114.975 }, healthScore: 88, dailyRevenueEur: 100000, panelsCount: 1200000, co2AvoidedTons: 140000 },
+  { id: 'US017', name: 'Copper Mountain Solar 4', county: 'Nevada', region: 'Boulder City', capacityMw: 179, operator: 'BHE Renewables / Sempra', commissionedDate: '2016', status: 'Operational', location: { lat: 35.805, lng: -114.97 }, healthScore: 89, dailyRevenueEur: 71000, panelsCount: 900000, co2AvoidedTons: 98000 },
+  { id: 'US018', name: 'Copper Mountain Solar 5', county: 'Nevada', region: 'Boulder City', capacityMw: 165, operator: 'BHE Renewables / Sempra', commissionedDate: '2021', status: 'Operational', location: { lat: 35.83, lng: -114.965 }, healthScore: 96, dailyRevenueEur: 66000, panelsCount: 500000, co2AvoidedTons: 92000, technicalDetails: 'Bifacial + single-axis tracking.' },
+  { id: 'US019', name: 'Edwards & Sanborn Solar + Storage', county: 'California', region: 'Kern County, Edwards AFB', capacityMw: 875, operator: 'Terra-Gen', commissionedDate: '2024', status: 'Operational', location: { lat: 34.95, lng: -117.9167 }, healthScore: 99, dailyRevenueEur: 350000, panelsCount: 1900000, co2AvoidedTons: 480000, technicalDetails: 'Worlds largest solar+storage. 3.3GWh battery capacity.' },
+  { id: 'US020', name: 'Antelope Valley Solar Ranch 1', county: 'California', region: 'Los Angeles County', capacityMw: 230, operator: 'Terra-Gen / Exelon', commissionedDate: '2014', status: 'Operational', location: { lat: 34.75, lng: -118.0 }, healthScore: 85, dailyRevenueEur: 92000, panelsCount: 3800000, co2AvoidedTons: 130000 },
+  { id: 'US021', name: 'Centinela Solar Energy', county: 'California', region: 'Imperial County', capacityMw: 170, operator: 'Terra-Gen', commissionedDate: '2013', status: 'Operational', location: { lat: 32.65, lng: -115.5 }, healthScore: 84, dailyRevenueEur: 68000, panelsCount: 800000, co2AvoidedTons: 95000, technicalDetails: 'High desert heat (45°C+).' },
+  { id: 'US022', name: 'Mount Signal Solar', county: 'California', region: 'Imperial County', capacityMw: 794, operator: '8minutenergy / Arevon', commissionedDate: '2014', status: 'Operational', location: { lat: 32.7, lng: -115.5667 }, healthScore: 87, dailyRevenueEur: 315000, panelsCount: 4000000, co2AvoidedTons: 440000 },
+  { id: 'US023', name: 'Springbok Solar 1', county: 'California', region: 'Kern County', capacityMw: 260, operator: '8minutenergy', commissionedDate: '2016', status: 'Operational', location: { lat: 35.1, lng: -118.5 }, healthScore: 88, dailyRevenueEur: 104000, panelsCount: 800000, co2AvoidedTons: 145000 },
+  { id: 'US024', name: 'Springbok Solar 2 & 3', county: 'California', region: 'Kern County', capacityMw: 390, operator: '8minutenergy', commissionedDate: '2017', status: 'Operational', location: { lat: 35.11, lng: -118.49 }, healthScore: 90, dailyRevenueEur: 156000, panelsCount: 1200000, co2AvoidedTons: 220000 },
+  { id: 'US025', name: 'Eland Solar & Storage', county: 'California', region: 'Kern County', capacityMw: 400, operator: '8minutenergy / Arevon', commissionedDate: '2023', status: 'Operational', location: { lat: 34.9, lng: -118.8 }, healthScore: 98, dailyRevenueEur: 160000, panelsCount: 1300000, co2AvoidedTons: 225000, technicalDetails: 'Includes 1.2GWh storage.' },
+  { id: 'US026', name: 'Garland Solar', county: 'California', region: 'Kern County', capacityMw: 200, operator: 'Recurrent Energy', commissionedDate: '2017', status: 'Operational', location: { lat: 35.2, lng: -118.4 }, healthScore: 89, dailyRevenueEur: 80000, panelsCount: 700000, co2AvoidedTons: 110000 },
+  { id: 'US027', name: 'Tranquillity Solar', county: 'California', region: 'Fresno County', capacityMw: 200, operator: 'Recurrent Energy', commissionedDate: '2018', status: 'Operational', location: { lat: 36.6, lng: -120.3 }, healthScore: 90, dailyRevenueEur: 80000, panelsCount: 700000, co2AvoidedTons: 110000 },
+  { id: 'US028', name: 'Mustang Solar', county: 'California', region: 'Kings County', capacityMw: 100, operator: 'Recurrent Energy', commissionedDate: '2016', status: 'Operational', location: { lat: 36.15, lng: -119.8 }, healthScore: 82, dailyRevenueEur: 40000, panelsCount: 350000, co2AvoidedTons: 55000 },
+  { id: 'US029', name: 'Agua Caliente Solar', county: 'Arizona', region: 'Yuma County', capacityMw: 290, operator: 'Clearway Energy / NRG', commissionedDate: '2014', status: 'Operational', location: { lat: 32.95, lng: -113.4 }, healthScore: 87, dailyRevenueEur: 116000, panelsCount: 5000000, co2AvoidedTons: 160000, technicalDetails: 'CdTe thin-film by First Solar.' },
+  { id: 'US030', name: 'Alpine Solar', county: 'California', region: 'Riverside County', capacityMw: 66, operator: 'Clearway Energy', commissionedDate: '2017', status: 'Operational', location: { lat: 33.6, lng: -116.2 }, healthScore: 85, dailyRevenueEur: 26000, panelsCount: 200000, co2AvoidedTons: 37000 },
+  { id: 'US031', name: 'Mesquite Solar 1', county: 'Arizona', region: 'Maricopa County', capacityMw: 150, operator: 'Clearway Energy', commissionedDate: '2013', status: 'Operational', location: { lat: 32.8, lng: -113.2 }, healthScore: 83, dailyRevenueEur: 60000, panelsCount: 800000, co2AvoidedTons: 85000 },
+  { id: 'US032', name: 'Samson Solar Energy Center', county: 'Texas', region: 'Lamar County', capacityMw: 1310, operator: 'Invenergy', commissionedDate: '2023', status: 'Operational', location: { lat: 33.6, lng: -95.5 }, healthScore: 99, dailyRevenueEur: 524000, panelsCount: 3500000, co2AvoidedTons: 750000, technicalDetails: 'Largest standalone PV in US. ERCOT market.' },
+  { id: 'US033', name: 'Roadrunner Solar + Storage', county: 'Texas', region: 'Upton County', capacityMw: 497, operator: 'Invenergy / OCI', commissionedDate: '2021', status: 'Operational', location: { lat: 31.35, lng: -102.15 }, healthScore: 95, dailyRevenueEur: 198000, panelsCount: 1500000, co2AvoidedTons: 280000, technicalDetails: 'Bifacial technology + 85.7MWh storage.' },
+  { id: 'US034', name: 'Lackawanna Solar', county: 'New York', region: 'Erie County', capacityMw: 50, operator: 'Invenergy', commissionedDate: '2019', status: 'Operational', location: { lat: 42.8, lng: -78.8 }, healthScore: 86, dailyRevenueEur: 20000, panelsCount: 150000, co2AvoidedTons: 28000, technicalDetails: 'Brownfield redevelopment project.' },
+  { id: 'US035', name: 'Grape Solar', county: 'California', region: 'Kern County', capacityMw: 109, operator: 'ENGIE', commissionedDate: '2016', status: 'Operational', location: { lat: 35.4, lng: -118.2 }, healthScore: 88, dailyRevenueEur: 43000, panelsCount: 330000, co2AvoidedTons: 60000 },
+  { id: 'US036', name: 'White River Solar', county: 'Arkansas', region: 'Desha County', capacityMw: 50, operator: 'ENGIE', commissionedDate: '2018', status: 'Operational', location: { lat: 33.7, lng: -91.4 }, healthScore: 85, dailyRevenueEur: 20000, panelsCount: 150000, co2AvoidedTons: 28000 },
+  { id: 'US037', name: 'California Flats Solar', county: 'California', region: 'Monterey County', capacityMw: 280, operator: 'EDF Renewables', commissionedDate: '2018', status: 'Operational', location: { lat: 35.9, lng: -120.6 }, healthScore: 90, dailyRevenueEur: 112000, panelsCount: 900000, co2AvoidedTons: 155000 },
+  { id: 'US038', name: 'Maverick Creek Solar', county: 'Texas', region: 'Val Verde County', capacityMw: 300, operator: 'EDF Renewables', commissionedDate: '2020', status: 'Operational', location: { lat: 29.9, lng: -101.2 }, healthScore: 92, dailyRevenueEur: 120000, panelsCount: 950000, co2AvoidedTons: 165000 },
+  { id: 'US039', name: 'Elm Branch Solar', county: 'Texas', region: 'Navarro County', capacityMw: 170, operator: 'Lightsource BP', commissionedDate: '2021', status: 'Operational', location: { lat: 32.0, lng: -96.5 }, healthScore: 93, dailyRevenueEur: 68000, panelsCount: 500000, co2AvoidedTons: 95000, technicalDetails: 'Major corporate PPA.' },
+  { id: 'US040', name: 'Cotton Plains Solar', county: 'Texas', region: 'Borden County', capacityMw: 200, operator: 'Lightsource BP', commissionedDate: '2022', status: 'Operational', location: { lat: 32.7, lng: -101.5 }, healthScore: 94, dailyRevenueEur: 80000, panelsCount: 600000, co2AvoidedTons: 110000 },
+  { id: 'US041', name: 'Permian Energy Center Solar', county: 'Texas', region: 'Andrews County', capacityMw: 520, operator: 'Ørsted', commissionedDate: '2021', status: 'Operational', location: { lat: 32.4, lng: -102.7 }, healthScore: 95, dailyRevenueEur: 208000, panelsCount: 1300000, co2AvoidedTons: 290000, technicalDetails: '1.3M panels in West Texas.' },
+  { id: 'US042', name: 'Helena Energy Center Solar', county: 'Texas', region: 'Bee County', capacityMw: 430, operator: 'Ørsted', commissionedDate: '2023', status: 'Operational', location: { lat: 28.5, lng: -97.7 }, healthScore: 97, dailyRevenueEur: 172000, panelsCount: 1200000, co2AvoidedTons: 240000, technicalDetails: 'Bifacial tracking system.' },
+  { id: 'US043', name: 'SB Orion 1 Solar Belt', county: 'Texas', region: 'Milam County', capacityMw: 300, operator: 'Samsung C&T / SB Energy', commissionedDate: '2024', status: 'Operational', location: { lat: 30.7833, lng: -96.95 }, healthScore: 98, dailyRevenueEur: 120000, panelsCount: 900000, co2AvoidedTons: 165000, technicalDetails: 'Powers Google data centers.' },
+  { id: 'US044', name: 'SB Orion 2 Solar Belt', county: 'Texas', region: 'Milam County', capacityMw: 300, operator: 'Samsung C&T / SB Energy', commissionedDate: '2024', status: 'Operational', location: { lat: 30.79, lng: -96.94 }, healthScore: 98, dailyRevenueEur: 120000, panelsCount: 900000, co2AvoidedTons: 165000 },
+  { id: 'US045', name: 'SB Orion 3 Solar Belt', county: 'Texas', region: 'Milam County', capacityMw: 300, operator: 'Samsung C&T / SB Energy', commissionedDate: '2024', status: 'Operational', location: { lat: 30.795, lng: -96.93 }, healthScore: 98, dailyRevenueEur: 120000, panelsCount: 900000, co2AvoidedTons: 165000 },
+  { id: 'US046', name: 'Ferrero Franklin Solar', county: 'New Jersey', region: 'Somerset County', capacityMw: 983, operator: 'Ferrero USA', commissionedDate: '2024', status: 'Operational', location: { lat: 40.5, lng: -74.6 }, healthScore: 95, dailyRevenueEur: 393200, panelsCount: 2900000, co2AvoidedTons: 550000, technicalDetails: 'Largest Northeast corporate on-site PV.' },
+  { id: 'US047', name: 'Mammoth Solar Phase 1', county: 'Indiana', region: 'Starke/Pulaski Counties', capacityMw: 400, operator: 'Doral Renewables', commissionedDate: '2024', status: 'Operational', location: { lat: 41.2, lng: -86.7 }, healthScore: 96, dailyRevenueEur: 160000, panelsCount: 1200000, co2AvoidedTons: 220000 },
+  { id: 'US048', name: 'Apple Park Solar', county: 'California', region: 'Cupertino + statewide', capacityMw: 130, operator: 'Apple Inc.', commissionedDate: '2018', status: 'Operational', location: { lat: 37.335, lng: -122.009 }, healthScore: 99, dailyRevenueEur: 52000, panelsCount: 390000, co2AvoidedTons: 70000, technicalDetails: 'Powers Apple corporate facilities.' },
+  { id: 'US049', name: 'Ivanpah Solar SEGS', county: 'California', region: 'San Bernardino County', capacityMw: 392, operator: 'NRG Energy / BrightSource', commissionedDate: '2014', status: 'Operational', location: { lat: 35.5567, lng: -115.4683 }, healthScore: 82, dailyRevenueEur: 156800, panelsCount: 0, co2AvoidedTons: 215000, technicalDetails: 'Unique CSP solar thermal towers.' },
+  { id: 'US050', name: 'Rosamond Central Solar', county: 'California', region: 'Kern County', capacityMw: 150, operator: 'Arevon / various', commissionedDate: '2016', status: 'Operational', location: { lat: 34.85, lng: -118.2 }, healthScore: 85, dailyRevenueEur: 60000, panelsCount: 450000, co2AvoidedTons: 82000 }
 ];
 
 export const searchParks = (query: string): SolarPark[] => {
-    const q = query.toLowerCase().trim();
-    if (q === 'romania' || q === 'toate' || q === 'top') {
-        return ROMANIAN_SOLAR_PARKS;
-    }
-    return ROMANIAN_SOLAR_PARKS.filter(p => 
+    const q = query.toLowerCase();
+    return GLOBAL_SOLAR_PARKS.filter(p => 
         p.name.toLowerCase().includes(q) || 
-        p.county.toLowerCase().includes(q) || 
+        p.id.toLowerCase() === q || 
+        p.county.toLowerCase().includes(q) ||
+        p.region?.toLowerCase().includes(q) ||
         p.operator.toLowerCase().includes(q)
     );
 };

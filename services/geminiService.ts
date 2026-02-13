@@ -321,7 +321,7 @@ const fetchBiodiversityReportTool: FunctionDeclaration = {
 const calculateCarbonImpactTool: FunctionDeclaration = {
   name: "calculate_carbon_impact",
   description: "ESG footprint analysis for carbon avoidance reporting.",
-  parameters: { type: Type.OBJECT, properties: { mwh: { type: Type.NUMBER } }, required: ["mwh"] }
+  parameters: { type: Type.OBJECT, properties: { mwh: { type: Type.NUMBER }, geometry: { type: Type.OBJECT } }, required: ["mwh"] }
 };
 
 const reverseGeocodeTool: FunctionDeclaration = {
@@ -350,6 +350,28 @@ const runSimulationTool: FunctionDeclaration = {
     properties: { placeId: { type: Type.STRING }, systemSizeKw: { type: Type.NUMBER } },
     required: ["placeId", "systemSizeKw"],
   },
+};
+
+// --- NEW TOOLS FROM PDF ARCHITECTURE ---
+
+const fetchNdviTimeseriesTool: FunctionDeclaration = {
+    name: "fetch_ndvi_timeseries",
+    description: "Get historical NDVI (Normalized Difference Vegetation Index) data for a specific park to analyze long-term vegetation health and soiling.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: { parkId: { type: Type.STRING } },
+        required: ["parkId"]
+    }
+};
+
+const checkThermalStatusTool: FunctionDeclaration = {
+    name: "check_thermal_status",
+    description: "Check the latest LST (Land Surface Temperature) scan for thermal anomalies or hot spots on the panels.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: { parkId: { type: Type.STRING } },
+        required: ["parkId"]
+    }
 };
 
 // --- OPEN-METEO IMPLEMENTATION HELPERS ---
@@ -506,6 +528,11 @@ export class GeminiOrchestrator {
        if (name === 'searchSolarParks') return { result: { parks: searchParks(args.query), count: searchParks(args.query).length } };
        if (name === 'runSimulation') return { result: await createSimulationJob(args.placeId, args.systemSizeKw) };
 
+       // New PDF Architecture Tools
+       if (name === 'fetch_ndvi_timeseries') return { result: await fetchJson(`/monitoring/ndvi/timeseries/${args.parkId}`) };
+       if (name === 'check_thermal_status') return { result: await fetchJson(`/monitoring/thermal/status/${args.parkId}`) };
+
+
      } catch (e: any) { return { error: e.message }; }
      return { error: "Unknown tool mapping" };
   }
@@ -611,7 +638,10 @@ export class GeminiOrchestrator {
         estimateSolarProductionTool, fetchBiodiversityReportTool, calculateCarbonImpactTool, 
         reverseGeocodeTool, searchPlacesTool, searchSolarParksTool, 
         runSimulationTool, fetchPerformanceBenchmarkTool, analyzePredictiveFailureTool, executeEnergyTradeTool,
-        planAgrivoltaicsTool, analyzePanelDnaTool
+        planAgrivoltaicsTool, analyzePanelDnaTool,
+        
+        // New PDF Architecture Tools
+        fetchNdviTimeseriesTool, checkThermalStatusTool
       ] 
     }];
 

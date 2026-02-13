@@ -104,6 +104,11 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                 ? `Generează o imagine fotorealistă 2K a parcului fotovoltaic ${siteName} în condiții de vreme actuală.` 
                 : `Generate a photorealistic 2K image of the solar park ${siteName} under current weather conditions.`;
               break;
+          case 'ndvi':
+              prompt = lang === 'ro' 
+                ? `Calculează indicele NDVI pentru ${siteName} folosind Planet Toolchain (Clip, Band Math, File Format). Stochează rezultatul pentru monitorizarea vegetației.`
+                : `Calculate NDVI for ${siteName} using Planet Toolchain (Clip, Band Math, File Format). Ensure result is stored and accessible for analysis.`;
+              break;
           case 'skysat':
               prompt = lang === 'ro' 
                 ? `Activează monitorizarea SkySat (50cm) pentru ${siteName} (${coords?.lat}, ${coords?.lng}) cu max 5% nori și benzile NIR, Red, Blue.`
@@ -296,11 +301,11 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                     <div className="px-4 pb-4">
                         <div className="grid grid-cols-2 gap-2 mb-2">
                             <button 
-                                onClick={() => triggerAction('image_gen')}
-                                className="bg-indigo-600 hover:bg-indigo-500 text-white p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-                                title="Generate Vision"
+                                onClick={() => triggerAction('ndvi')}
+                                className="bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 border border-emerald-500/30 p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
+                                title="Run NDVI Planet Toolchain"
                             >
-                                <span>🎨</span> Vision
+                                <span>🌱</span> NDVI Analiza
                             </button>
                             <button 
                                 onClick={() => triggerAction('skysat')}
