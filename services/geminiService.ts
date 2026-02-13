@@ -44,6 +44,36 @@ const fetchJson = async (endpoint: string, options: any = {}) => {
     }
 };
 
+// --- EXPORTED API WRAPPERS FOR DIAGNOSTICS ---
+
+export const fetchPlanetImageryAPI = async (params: any) => {
+    return fetchJson('/satellite/planet', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(params)
+    });
+};
+
+export const fetchSatelliteImageryAPI = async (params: any) => {
+    return fetchJson('/satellite/imagery', { 
+       method: 'POST', 
+       headers: {'Content-Type':'application/json'}, 
+       body: JSON.stringify(params) 
+    });
+};
+
+export const executeEnergyTradeAPI = async (params: any) => {
+    return fetchJson('/market/trade', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(params) });
+};
+
+export const analyzePredictiveFailureAPI = async (params: any) => {
+    return fetchJson('/analytics/failure-prediction', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(params) });
+};
+
+export const calculateCarbonImpactAPI = async (params: any) => {
+    return fetchJson('/esg/carbon-impact', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(params) });
+};
+
 // --- TECHNICAL TOOLS REGISTRY ---
 
 const generateSiteReportTool: FunctionDeclaration = {
@@ -70,9 +100,17 @@ const fetchWeatherForecastTool: FunctionDeclaration = {
         properties: {
             latitude: { type: Type.NUMBER },
             longitude: { type: Type.NUMBER },
-            hourly: { type: Type.ARRAY, items: { type: Type.STRING } },
+            hourly: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING },
+                default: ["temperature_2m", "relative_humidity_2m", "precipitation", "cloud_cover", "wind_speed_10m", "shortwave_radiation"]
+            },
             daily: { type: Type.ARRAY, items: { type: Type.STRING } },
-            current: { type: Type.ARRAY, items: { type: Type.STRING } },
+            current: { 
+                type: Type.ARRAY, 
+                items: { type: Type.STRING },
+                default: ["temperature_2m", "cloud_cover", "wind_speed_10m"]
+            },
             past_days: { type: Type.NUMBER, description: "Include past days data (0-92)" },
             forecast_days: { type: Type.NUMBER, description: "Number of forecast days (0-16). Default 7." },
             tilt: { type: Type.NUMBER, description: "Solar panel tilt angle (0-90)" },
@@ -109,7 +147,7 @@ const fetch15MinuteSolarDataTool: FunctionDeclaration = {
         properties: {
             latitude: { type: Type.NUMBER },
             longitude: { type: Type.NUMBER },
-            minutely_15: { type: Type.ARRAY, items: { type: Type.STRING }, default: ["shortwave_radiation", "direct_normal_irradiance", "global_tilted_irradiance"] },
+            minutely_15: { type: Type.ARRAY, items: { type: Type.STRING }, default: ["shortwave_radiation", "direct_normal_irradiance", "global_tilted_irradiance", "temperature_2m"] },
             forecast_minutely_15: { type: Type.NUMBER, default: 96 },
             tilt: { type: Type.NUMBER },
             azimuth: { type: Type.NUMBER }
@@ -439,20 +477,26 @@ export class GeminiOrchestrator {
   async executeSpecialTool(name: string, args: any, lastImageContext?: string): Promise<any> {
      try {
        // --- OPEN-METEO SUITE ---
-       if (name === 'fetch_weather_forecast') return { result: await fetchWeatherForecast(args) };
+       if (name === 'fetch_weather_forecast') {
+           const finalArgs = { ...args };
+           // Ensure temperature is fetched if not explicitly requested
+           if (!finalArgs.hourly) finalArgs.hourly = ["temperature_2m", "relative_humidity_2m", "precipitation", "cloud_cover", "wind_speed_10m", "shortwave_radiation"];
+           if (!finalArgs.current) finalArgs.current = ["temperature_2m", "cloud_cover", "wind_speed_10m"];
+           return { result: await fetchWeatherForecast(finalArgs) };
+       }
        
        if (name === 'fetch_solar_radiation_forecast') {
             return { result: await fetchWeatherForecast({
                 ...args, 
-                hourly: ["shortwave_radiation", "direct_radiation", "diffuse_radiation", "direct_normal_irradiance", "global_tilted_irradiance"],
-                current: ["cloud_cover", "shortwave_radiation"]
+                hourly: ["temperature_2m", "shortwave_radiation", "direct_radiation", "diffuse_radiation", "direct_normal_irradiance", "global_tilted_irradiance"],
+                current: ["temperature_2m", "cloud_cover", "shortwave_radiation"]
             })};
        }
 
        if (name === 'fetch_15_minute_solar_data') {
            return { result: await fetchWeatherForecast({
                ...args,
-               minutely_15: args.minutely_15 || ["shortwave_radiation", "direct_normal_irradiance", "global_tilted_irradiance"]
+               minutely_15: args.minutely_15 || ["temperature_2m", "shortwave_radiation", "direct_normal_irradiance", "global_tilted_irradiance"]
            })};
        }
 
@@ -475,40 +519,18 @@ export class GeminiOrchestrator {
 
        // Planet Labs Premium Proxy
        if (name === 'fetch_planet_imagery') {
-           const res = await fetchJson('/satellite/planet', {
-               method: 'POST',
-               headers: {'Content-Type': 'application/json'},
-               body: JSON.stringify(args)
-           });
-           return { result: res };
+           return { result: await fetchPlanetImageryAPI(args) };
        }
 
        // Panel DNA (Wrapper for SkySat)
        if (name === 'analyze_panel_dna') {
-           const res = await fetchJson('/satellite/planet', {
-               method: 'POST',
-               headers: {'Content-Type': 'application/json'},
-               body: JSON.stringify({ ...args, source: 'skysat' })
-           });
-           return { result: res };
+           return { result: await fetchPlanetImageryAPI({ ...args, source: 'skysat' }) };
        }
 
        // Copernicus Satellite Integration Proxy
        if (name === 'fetch_satellite_imagery') {
          const { bbox, collection, startDate, endDate, cloudCover, evalscript } = args;
-         const res = await fetchJson('/satellite/imagery', { 
-           method: 'POST', 
-           headers: {'Content-Type':'application/json'}, 
-           body: JSON.stringify({ 
-             bbox, 
-             collection: collection || 'SENTINEL2', 
-             startDate, 
-             endDate,
-             cloudCover,
-             evalscript 
-           }) 
-         });
-         return { result: res };
+         return { result: await fetchSatelliteImageryAPI({ bbox, collection: collection || 'SENTINEL2', startDate, endDate, cloudCover, evalscript }) };
        }
 
        // Core Function Proxies
@@ -519,8 +541,8 @@ export class GeminiOrchestrator {
        
        // New Advanced Analytics Tools
        if (name === 'fetch_performance_benchmark') return { result: await fetchJson(`/analytics/benchmark?parkId=${args.parkId}&region=${args.region || ''}`) };
-       if (name === 'analyze_predictive_failure') return { result: await fetchJson('/analytics/failure-prediction', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(args) }) };
-       if (name === 'execute_energy_trade') return { result: await fetchJson('/market/trade', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(args) }) };
+       if (name === 'analyze_predictive_failure') return { result: await analyzePredictiveFailureAPI(args) };
+       if (name === 'execute_energy_trade') return { result: await executeEnergyTradeAPI(args) };
        if (name === 'plan_agrivoltaics') return { result: await fetchJson(`/geo/agrivoltaics?location=${args.location}&cropType=${args.cropType || ''}`) };
 
        // Infrastructure Tools
