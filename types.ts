@@ -1,5 +1,4 @@
 
-
 export enum SimulationStatus {
   PENDING = 'PENDING',
   PROCESSING = 'PROCESSING',
@@ -124,6 +123,23 @@ export type Language = 'ro' | 'en';
 
 // --- QUICK WIN TYPES (Features 1, 4, 5, 6) ---
 
+export interface PlanetImagery {
+    id: string;
+    status: 'active' | 'completed' | 'failed';
+    item_type: string;
+    resolution: string; // e.g., "3m"
+    source: "PlanetScope" | "SkySat";
+    ndvi_mean: number;
+    evi_mean?: number; // Enhanced Vegetation Index
+    spectral_metrics?: {
+        nir_mean: number;
+        red_mean: number;
+        blue_mean: number;
+    };
+    visual_url: string;
+    acquisition_date: string;
+}
+
 export interface CleaningSchedule {
   parkId: string;
   dustIQScore: number;
@@ -150,8 +166,8 @@ export interface ProductionAnomaly {
 export interface SolarForecast {
   time: string;
   ghi: number; // Global Horizontal Irradiance W/m2
-  dni?: number; // Direct Normal Irradiance W/m2 (Essential for tracking)
-  dhi?: number; // Diffuse Horizontal Irradiance W/m2
+  dni: number; // Direct Normal Irradiance W/m2 (Essential for tracking)
+  dhi: number; // Diffuse Horizontal Irradiance W/m2
   temp: number; // Celsius
   cloudCover: number; // %
   productionEstimateMw: number;

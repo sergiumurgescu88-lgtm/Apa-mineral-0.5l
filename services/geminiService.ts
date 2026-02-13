@@ -1,13 +1,18 @@
-
-import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
+import { GoogleGenAI, Type, FunctionDeclaration, GenerateContentResponse } from "@google/genai";
 import { searchPlaces } from "./googleMapsService";
 import { analyzeRoofImage } from "./annoBananaService";
 import { createSimulationJob, getLicenseInfo } from "./pvsystService";
 import { searchParks } from "./solarParkData";
-import { SYSTEM_INSTRUCTION_RO, SYSTEM_INSTRUCTION_EN, GEMINI_PRO_MODEL_ID, GEMINI_FLASH_MODEL_ID, DEFAULT_MODEL_ID } from "../constants";
+import { 
+  SYSTEM_INSTRUCTION_RO, 
+  SYSTEM_INSTRUCTION_EN, 
+  GEMINI_PRO_MODEL_ID, 
+  GEMINI_FLASH_MODEL_ID, 
+  DEFAULT_MODEL_ID,
+  GEMINI_IMAGE_GEN_MODEL_ID,
+  GEMINI_IMAGE_EDIT_MODEL_ID
+} from "../constants";
 import { ImageSize, Language, Attachment, GroundingSource } from "../types";
-
-// --- Retry Logic Helper ---
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -15,14 +20,10 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, baseDelay = 2000)
   try {
     return await fn();
   } catch (e: any) {
-    const isRateLimit = e.message?.includes('429') || 
-                        e.message?.includes('RESOURCE_EXHAUSTED') ||
-                        e.status === 429 ||
-                        e.status === 503;
-
+    const isRateLimit = e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED') || e.status === 429 || e.status === 503;
     if (retries > 0 && isRateLimit) {
       const waitTime = baseDelay * (3 - retries); 
-      console.warn(`[Gemini] Rate limit hit (${e.status || 'Quota'}). Retrying in ${waitTime}ms... (${retries} retries left)`);
+      console.warn(`[Gemini] Rate limit hit. Retrying in ${waitTime}ms...`);
       await delay(waitTime);
       return withRetry(fn, retries - 1, baseDelay);
     }
@@ -30,332 +31,267 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 2, baseDelay = 2000)
   }
 }
 
-// --- API Helpers ---
-
 const BACKEND = 'http://localhost:3001/api';
 
 const fetchJson = async (endpoint: string, options: any = {}) => {
     try {
         const res = await fetch(`${BACKEND}${endpoint}`, options);
+        if (!res.ok) throw new Error(`Backend Error ${res.status}`);
         return await res.json();
     } catch (e: any) {
         return { error: `Backend connection failed: ${e.message}`, isConnectionError: true };
     }
 };
 
-// --- Mock Data Generators (Fallback) ---
-// These ensure the AI works even if the Node.js backend is offline
+// --- TECHNICAL TOOLS REGISTRY ---
 
-const MOCK_DATA = {
-    cleaning: (lat: any, lng: any) => ({
-        status: 'success',
-        schedule: {
-            dustIQScore: 65,
-            soilingLoss: 4.2,
-            daysSinceCleaning: 22,
-            rainForecast: "2.5mm next 72h",
-            recommendation: "WAIT",
-            urgency: "medium",
-            roiEstimate: 850
-        }
-    }),
-    anomalies: () => ({
-        status: 'success',
-        count: 2,
-        systemHealthScore: 88,
-        anomalies: [
-            {
-                id: 'ANM-Mock-01',
-                type: 'inverter_low_efficiency',
-                equipment: 'INV_04',
-                timestamp: new Date().toISOString(),
-                currentValue: '88.5%',
-                expectedValue: '> 96%',
-                severity: 'MEDIUM',
-                message: 'Inverter INV_04 operating at 88.5% efficiency',
-                recommendedAction: 'Inspect inverter cooling system'
-            },
-            {
-                id: 'ANM-Mock-02',
-                type: 'string_underperformance',
-                equipment: 'STR_12_B',
-                timestamp: new Date().toISOString(),
-                currentValue: '4.2A',
-                expectedValue: '8.5A',
-                severity: 'HIGH',
-                message: 'String STR_12_B current is 50% below average',
-                recommendedAction: 'Check for fuse failure or shading'
-            }
-        ]
-    }),
-    forecast: (lat: any, lng: any) => ({
-        status: 'success',
-        forecast: {
-            time: 'Now',
-            ghi: 850,
-            dni: 720,
-            dhi: 120,
-            temp: 24,
-            cloudCover: 15,
-            productionEstimateMw: 12.5,
-            confidence: 0.92
-        }
-    }),
-    benchmarking: () => ({
-        status: 'success',
-        metrics: [
-            {
-                fleetId: 'ROMANIA_SOLAR_ALL',
-                metric: 'Performance Ratio (PR)',
-                yourPark: 82.4,
-                networkAvg: 78.1,
-                topPerformer: 86.5,
-                rank: 4,
-                percentile: 85,
-                status: 'ABOVE_AVG'
-            }
-        ]
-    })
-};
-
-// --- Specialized Internal Functions ---
-
-export const generateImageWithNanoBananaPro = async (apiKey: string, prompt: string, size: ImageSize = '1K'): Promise<string> => {
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview',
-      contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "16:9", imageSize: size } },
-    });
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+const generateSiteReportTool: FunctionDeclaration = {
+    name: "generate_technical_site_report",
+    description: "Synthesize all current site data (Telemetry, Planet High-Res, Copernicus, Meteo, PVsyst) into a high-level executive report with prioritized action items.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            siteName: { type: Type.STRING },
+            telemetrySummary: { type: Type.STRING, description: "Raw or summarized data from other tools." },
+            tone: { type: Type.STRING, enum: ["technical", "executive", "urgent"], default: "executive" }
+        },
+        required: ["siteName", "telemetrySummary"]
     }
-    throw new Error("No image generated");
-  });
 };
 
-export const editImageWithNanoBanana = async (apiKey: string, base64Image: string, prompt: string): Promise<string> => {
-  return withRetry(async () => {
-    const ai = new GoogleGenAI({ apiKey });
-    // Remove data URL prefix if present for the API call
-    const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image', // Specific model for editing as requested
-      contents: {
-        parts: [
-          { inlineData: { data: cleanBase64, mimeType: 'image/png' } },
-          { text: prompt },
-        ],
+const fetchSatelliteImageryTool: FunctionDeclaration = {
+  name: "fetch_satellite_imagery",
+  description: "Fetch technical satellite analysis from Copernicus Data Space (Sentinel-1 SAR, Sentinel-2 Optical, Sentinel-3 Thermal). Essential for regional monitoring and broad-scale NDVI.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      bbox: { 
+        type: Type.ARRAY, 
+        items: { type: Type.NUMBER }, 
+        description: "Bounding box coordinates: [minLongitude, minLatitude, maxLongitude, maxLatitude]" 
       },
-    });
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
+      collection: { 
+        type: Type.STRING, 
+        enum: ["SENTINEL2", "SENTINEL1", "SENTINEL3", "LANDSAT"], 
+        default: "SENTINEL2",
+        description: "Copernicus data collection to query."
+      },
+      startDate: { type: Type.STRING, description: "Start date for imagery search (YYYY-MM-DD)." },
+      endDate: { type: Type.STRING, description: "End date for imagery search (YYYY-MM-DD)." },
+      cloudCover: { 
+          type: Type.NUMBER, 
+          description: "Maximum allowed cloud cover percentage (0-100). Default is 20.",
+          default: 20
+      },
+      evalscript: { 
+        type: Type.STRING, 
+        description: "Javascript evalscript for custom pixel manipulation (e.g. NDVI or LAI calculation)." 
+      }
+    },
+    required: ["bbox", "startDate", "endDate"]
+  }
+};
+
+const fetchPlanetImageryTool: FunctionDeclaration = {
+    name: "fetch_planet_imagery",
+    description: "Fetch ultra-high-resolution satellite imagery via Planet Labs Subscriptions API. Supports SkySat (50cm) and PlanetScope (3m). Uses the 'Clip', 'Band Math', 'Composite', and 'File Format' tools from the Planet Toolchain for advanced processing.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            name: { type: Type.STRING, description: "Site name or subscription identifier." },
+            coordinates: { 
+                type: Type.ARRAY, 
+                items: { type: Type.NUMBER }, 
+                description: "Array of coordinates forming the asset boundary [lng, lat, ...]" 
+            },
+            source: { 
+                type: Type.STRING, 
+                enum: ["planetscope", "skysat"], 
+                default: "planetscope",
+                description: "Constellation source. Use 'skysat' for 0.5m resolution (precision tasks) or 'planetscope' for 3m (monitoring)."
+            },
+            startDate: { type: Type.STRING, description: "Acquisition start (YYYY-MM-DD)." },
+            cloudCover: { 
+                type: Type.NUMBER, 
+                description: "Strict cloud filtering threshold (0-100). For SkySat precision tasks, use 5% or lower.", 
+                default: 20
+            },
+            spectralBands: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING, enum: ["NIR", "Red", "Blue", "Green", "RedEdge", "Thermal"] },
+                description: "Specific bands to retrieve. For NDVI/EVI analysis, specify ['NIR', 'Red', 'Blue']."
+            }
+        },
+        required: ["coordinates", "startDate"]
     }
-    throw new Error("No edited image returned");
-  });
 };
 
-export const readUrlFromBackend = async (url: string): Promise<string> => {
-    const data = await fetchJson('/tools/read-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url })
-    });
-    return data.status === 'success' ? data.content : `Error: ${data.error}`;
-}
-
-export const performWebSearch = async (apiKey: string, query: string): Promise<{text: string, sources: GroundingSource[]}> => {
-    return withRetry(async () => {
-        const ai = new GoogleGenAI({ apiKey });
-        const response = await ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: query,
-            config: { tools: [{ googleSearch: {} }] }
-        });
-
-        const sources: GroundingSource[] = [];
-        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        chunks.forEach((chunk: any) => {
-            if (chunk.web) sources.push({ title: chunk.web.title, uri: chunk.web.uri, type: 'web' });
-        });
-
-        return { text: response.text || "No text", sources };
-    });
+const fetchPerformanceBenchmarkTool: FunctionDeclaration = {
+    name: "fetch_performance_benchmark",
+    description: "Compare current solar park performance against regional averages and top performers (PR, Specific Yield).",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            parkId: { type: Type.STRING },
+            region: { type: Type.STRING }
+        },
+        required: ["parkId"]
+    }
 };
 
-export const performMapsSearch = async (apiKey: string, query: string): Promise<{text: string, sources: GroundingSource[]}> => {
-    return withRetry(async () => {
-        const ai = new GoogleGenAI({ apiKey });
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: query,
-            config: { tools: [{ googleMaps: {} }] }
-        });
-        const sources: GroundingSource[] = [];
-        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-        chunks.forEach((chunk: any) => {
-            if (chunk.web) sources.push({ title: chunk.web.title, uri: chunk.web.uri, type: 'web' });
-            else if (chunk.maps) sources.push({ title: chunk.maps.title || "Result", uri: chunk.maps.uri || "", type: 'map' });
-        });
-        return { text: response.text || "No text", sources };
-    });
+const analyzePredictiveFailureTool: FunctionDeclaration = {
+    name: "analyze_predictive_failure",
+    description: "Run LSTM (Long Short-Term Memory) models on telemetry to predict component failures (Inverters, Strings).",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            parkId: { type: Type.STRING },
+            horizonDays: { type: Type.NUMBER, description: "Prediction horizon in days" }
+        },
+        required: ["parkId"]
+    }
 };
 
+const executeEnergyTradeTool: FunctionDeclaration = {
+    name: "execute_energy_trade",
+    description: "Execute or simulate an algorithmic energy trade on the OPCOM/Day-Ahead market based on forecast.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            action: { type: Type.STRING, enum: ["BUY", "SELL", "HOLD"] },
+            volumeMwh: { type: Type.NUMBER },
+            priceLimit: { type: Type.NUMBER }
+        },
+        required: ["action", "volumeMwh"]
+    }
+};
 
-// --- Function Declarations for Gemini Orchestrator ---
+const planAgrivoltaicsTool: FunctionDeclaration = {
+    name: "plan_agrivoltaics",
+    description: "Generate an agricultural compatibility report for a solar site (Crop suitability, shading analysis).",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            location: { type: Type.STRING },
+            areaHectares: { type: Type.NUMBER },
+            cropType: { type: Type.STRING }
+        },
+        required: ["location"]
+    }
+};
+
+const analyzePanelDnaTool: FunctionDeclaration = {
+    name: "analyze_panel_dna",
+    description: "Perform ultra-high precision (50cm) SkySat analysis to detect micro-cracks or specific panel DNA anomalies.",
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            parkId: { type: Type.STRING },
+            coordinates: { type: Type.ARRAY, items: { type: Type.NUMBER } }
+        },
+        required: ["coordinates"]
+    }
+};
+
+const fetchProductionForecastTool: FunctionDeclaration = {
+  name: "fetch_production_forecast",
+  description: "Predictive production via Forecast.Solar technical engine.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: { lat: { type: Type.NUMBER }, lng: { type: Type.NUMBER }, dec: { type: Type.NUMBER }, az: { type: Type.NUMBER }, kwp: { type: Type.NUMBER } },
+    required: ["lat", "lng", "kwp"]
+  }
+};
+
+const fetchBiodiversityReportTool: FunctionDeclaration = {
+  name: "fetch_biodiversity_report",
+  description: "Species observations via GBIF. Used for ESG and Agrivoltaics environmental impact studies.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: { lat: { type: Type.NUMBER }, lng: { type: Type.NUMBER }, radius: { type: Type.NUMBER } },
+    required: ["lat", "lng"]
+  }
+};
+
+const calculateCarbonImpactTool: FunctionDeclaration = {
+  name: "calculate_carbon_impact",
+  description: "ESG footprint analysis for carbon avoidance reporting.",
+  parameters: { type: Type.OBJECT, properties: { mwh: { type: Type.NUMBER } }, required: ["mwh"] }
+};
+
+const reverseGeocodeTool: FunctionDeclaration = {
+  name: "reverse_geocode",
+  description: "Convert GPS coordinates to physical address via Maps.co API.",
+  parameters: { type: Type.OBJECT, properties: { lat: { type: Type.NUMBER }, lng: { type: Type.NUMBER } }, required: ["lat", "lng"] }
+};
 
 const searchPlacesTool: FunctionDeclaration = {
   name: "searchPlaces",
-  description: "Search for a physical location to display on the interactive map visualizer.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: { query: { type: Type.STRING } },
-    required: ["query"],
-  },
+  description: "Search for a physical location via Google Maps backend.",
+  parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING } }, required: ["query"] },
 };
 
 const searchSolarParksTool: FunctionDeclaration = {
   name: "searchSolarParks",
-  description: "Search internal DB for Solar Parks. Returns technical details and location.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: { query: { type: Type.STRING } },
-    required: ["query"],
-  },
-};
-
-const performWebSearchTool: FunctionDeclaration = {
-    name: "performWebSearch",
-    description: "Google Search for real-time info/news.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: { query: { type: Type.STRING } },
-        required: ["query"]
-    }
-};
-
-const performMapsSearchTool: FunctionDeclaration = {
-    name: "performMapsSearch",
-    description: "Google Maps search for places/navigation.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: { query: { type: Type.STRING } },
-        required: ["query"]
-    }
-};
-
-const readUrlTool: FunctionDeclaration = {
-    name: "readUrl",
-    description: "Read content of a URL.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: { url: { type: Type.STRING } },
-        required: ["url"]
-    }
-};
-
-const analyzeRoofTool: FunctionDeclaration = {
-  name: "analyzeRoof",
-  description: "Analyze roof image for PV potential (Mock Service). For general image understanding, just answer directly.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: { imageUrl: { type: Type.STRING } },
-    required: ["imageUrl"],
-  },
+  description: "Search internal Helios SCADA database for operational solar assets in Romania.",
+  parameters: { type: Type.OBJECT, properties: { query: { type: Type.STRING } }, required: ["query"] },
 };
 
 const runSimulationTool: FunctionDeclaration = {
   name: "runSimulation",
-  description: "Run PVsyst simulation.",
+  description: "Trigger a remote PVsyst CLI simulation job for advanced energy modeling.",
   parameters: {
     type: Type.OBJECT,
-    properties: {
-      placeId: { type: Type.STRING },
-      systemSizeKw: { type: Type.NUMBER },
-      project: { type: Type.STRING },
-      variant: { type: Type.STRING },
-      tilt: { type: Type.NUMBER },
-      azimuth: { type: Type.NUMBER },
-      modulePower: { type: Type.NUMBER }
-    },
+    properties: { placeId: { type: Type.STRING }, systemSizeKw: { type: Type.NUMBER } },
     required: ["placeId", "systemSizeKw"],
   },
 };
 
-const checkLicenseTool: FunctionDeclaration = {
-  name: "checkLicense",
-  description: "Check PVsyst license.",
-  parameters: { type: Type.OBJECT, properties: {} },
+const fetchWeatherForecastTool: FunctionDeclaration = {
+    name: "fetch_weather_forecast",
+    description: "Fetch comprehensive meteorological data from Open-Meteo API.",
+    parameters: { type: Type.OBJECT, properties: { latitude: { type: Type.NUMBER }, longitude: { type: Type.NUMBER } }, required: ["latitude", "longitude"] }
 };
 
-const generateImageTool: FunctionDeclaration = {
-  name: "generateImage",
-  description: "Generate a new image using Nano Banana Pro (Gemini 3 Pro Image). Use this for creating visuals from scratch.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: {
-      prompt: { type: Type.STRING },
-      size: { type: Type.STRING, enum: ["1K", "2K", "4K"] },
-    },
-    required: ["prompt"],
-  },
+const fetchSolarRadiationForecastTool: FunctionDeclaration = {
+    name: "fetch_solar_radiation_forecast",
+    description: "Fetch high-precision solar radiation indices (DNI, GHI, GTI) for technical yield prediction.",
+    parameters: { type: Type.OBJECT, properties: { latitude: { type: Type.NUMBER }, longitude: { type: Type.NUMBER } }, required: ["latitude", "longitude"] }
 };
 
-const editImageTool: FunctionDeclaration = {
-  name: "editImage",
-  description: "Edit the previously uploaded or generated image using Gemini 2.5 Flash Image. Use this when the user asks to 'modify', 'add filter', 'remove object', or 'change' the current image.",
-  parameters: {
-    type: Type.OBJECT,
-    properties: { 
-        prompt: { type: Type.STRING, description: "Description of the edit to apply (e.g. 'add a retro filter', 'make it snowy')" } 
-    },
-    required: ["prompt"],
-  },
-};
+// --- TECHNICAL OPEN-METEO HANDLERS ---
 
-// --- QUICK WIN TOOLS (The 4 Requested Features) ---
+export const fetchWeatherForecast = async (params: any) => {
+  const baseUrl = 'https://api.open-meteo.com/v1/forecast';
+  const url = new URL(baseUrl);
+  url.searchParams.append('latitude', params.latitude.toString());
+  url.searchParams.append('longitude', params.longitude.toString());
+  if (params.hourly) url.searchParams.append('hourly', Array.isArray(params.hourly) ? params.hourly.join(',') : params.hourly);
+  if (params.daily) url.searchParams.append('daily', Array.isArray(params.daily) ? params.daily.join(',') : params.daily);
+  if (params.current) url.searchParams.append('current', Array.isArray(params.current) ? params.current.join(',') : params.current);
+  if (params.minutely_15) url.searchParams.append('minutely_15', Array.isArray(params.minutely_15) ? params.minutely_15.join(',') : params.minutely_15);
+  if (params.tilt !== undefined) url.searchParams.append('tilt', params.tilt.toString());
+  if (params.azimuth !== undefined) url.searchParams.append('azimuth', params.azimuth.toString());
+  if (params.timezone) url.searchParams.append('timezone', params.timezone || 'auto');
+  if (params.forecast_days !== undefined) url.searchParams.append('forecast_days', params.forecast_days.toString());
+  
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      throw new Error(`Open-Meteo Error ${response.status}: ${errBody.reason || 'Unknown error'}`);
+  }
+  return await response.json();
+}
 
-const getCleaningScheduleTool: FunctionDeclaration = {
-    name: "getCleaningSchedule",
-    description: "Calculate optimal cleaning schedule using Solcast (Weather) & DustIQ (Soiling) logic.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            lat: { type: Type.NUMBER },
-            lng: { type: Type.NUMBER }
-        },
-        required: ["lat", "lng"]
-    }
-};
+// --- SERVICE CLASS ---
 
-const analyzeAnomaliesTool: FunctionDeclaration = {
-    name: "analyzeAnomalies",
-    description: "Run AI analysis on SCADA data to detect production anomalies (TensorFlow logic).",
-    parameters: { type: Type.OBJECT, properties: {} }
-};
-
-const getSolarForecastTool: FunctionDeclaration = {
-    name: "getSolarForecast",
-    description: "Get solar-specific weather forecast (Irradiance/Clouds) for next 24h.",
-    parameters: {
-        type: Type.OBJECT,
-        properties: {
-            lat: { type: Type.NUMBER },
-            lng: { type: Type.NUMBER }
-        },
-        required: ["lat", "lng"]
-    }
-};
-
-const runBenchmarkingTool: FunctionDeclaration = {
-    name: "runBenchmarking",
-    description: "Compare park performance against fleet averages (PostgreSQL/Grafana logic).",
-    parameters: { type: Type.OBJECT, properties: {} }
-};
-
-// --- Service Class ---
+export interface GeminiRequestConfig {
+    isThinking?: boolean;
+    isImageGen?: boolean;
+    imageSize?: ImageSize;
+    isImageEdit?: boolean;
+    editContext?: { data: string, mimeType: string };
+}
 
 export class GeminiOrchestrator {
   private ai: GoogleGenAI;
@@ -367,295 +303,309 @@ export class GeminiOrchestrator {
     this.ai = new GoogleGenAI({ apiKey });
   }
 
-  // --- OFFLINE INTENT MATCHING ---
-  // If API fails, we use this to guess what the user wanted and return Mock Data
-  private async getFallbackResponse(text: string, onToolCall?: (name: string, args: any) => void): Promise<string> {
-      const lower = text.toLowerCase();
-      
-      // 1. Cleaning
-      if (lower.includes('clean') || lower.includes('curat') || lower.includes('spal') || lower.includes('dust') || lower.includes('praf')) {
-          const mock = MOCK_DATA.cleaning(44.4, 26.1);
-          if (onToolCall) onToolCall('getCleaningSchedule', { lat: 44.4, lng: 26.1 });
-          return `(Offline Mode) **Analiză DustIQ & Solcast:**
-          
-- **Scor Murdărire (DustIQ):** ${mock.schedule.dustIQScore}/100
-- **Pierdere Energie:** ${mock.schedule.soilingLoss}%
-- **Zile de la ultima curățare:** ${mock.schedule.daysSinceCleaning}
-- **Prognoză Ploaie:** ${mock.schedule.rainForecast}
-
-**Recomandare:** ${mock.schedule.recommendation === 'WAIT' ? '⏳ AȘTEAPTĂ (Vine ploaia)' : '🧹 CURĂȚĂ ACUM'}
-**Urgență:** ${mock.schedule.urgency.toUpperCase()}
-**ROI Estimat:** €${mock.schedule.roiEstimate}`;
-      }
-
-      // 2. Anomalies
-      if (lower.includes('anomal') || lower.includes('defect') || lower.includes('error') || lower.includes('proble') || lower.includes('check') || lower.includes('verific')) {
-          const mock = MOCK_DATA.anomalies();
-          if (onToolCall) onToolCall('analyzeAnomalies', {});
-          return `(Offline Mode) **Raport SCADA AI:**
-
-Am analizat 5 invertoare și 128 string-uri.
-**Scor Sănătate Sistem:** ${mock.systemHealthScore}%
-**Anomalii Detectate:** ${mock.count}
-
-1. ⚠️ **${mock.anomalies[0].type}** (${mock.anomalies[0].equipment}): ${mock.anomalies[0].message}
-   *Acțiune:* ${mock.anomalies[0].recommendedAction}
-
-2. 🔴 **${mock.anomalies[1].type}** (${mock.anomalies[1].equipment}): ${mock.anomalies[1].message}
-   *Acțiune:* ${mock.anomalies[1].recommendedAction}`;
-      }
-
-      // 3. Forecast
-      if (lower.includes('weather') || lower.includes('vreme') || lower.includes('meteo') || lower.includes('solar') || lower.includes('soare') || lower.includes('forecast')) {
-          const mock = MOCK_DATA.forecast(44.4, 26.1);
-          if (onToolCall) onToolCall('getSolarForecast', { lat: 44.4, lng: 26.1 });
-          return `(Offline Mode) **Prognoză Solară (Open-Meteo):**
-
-- **GHI (Global Horizontal):** ${mock.forecast.ghi} W/m²
-- **DNI (Direct Normal):** ${mock.forecast.dni} W/m²
-- **Acoperire Nori:** ${mock.forecast.cloudCover}%
-- **Producție Estimată (Acum):** ${mock.forecast.productionEstimateMw} MW
-- **Temperatură:** ${mock.forecast.temp}°C`;
-      }
-
-      // 4. Benchmarking
-      if (lower.includes('benchmark') || lower.includes('compar') || lower.includes('rank') || lower.includes('top') || lower.includes('flota') || lower.includes('fleet')) {
-          const mock = MOCK_DATA.benchmarking();
-          if (onToolCall) onToolCall('runBenchmarking', {});
-          return `(Offline Mode) **Analiză Comparativă Flotă:**
-
-Parcul tău vs. Rețeaua Națională (28 Parcuri):
-- **Locul:** #${mock.metrics[0].rank}
-- **Performance Ratio (PR):** ${mock.metrics[0].yourPark}% (Media: ${mock.metrics[0].networkAvg}%)
-- **Status:** ${mock.metrics[0].status === 'ABOVE_AVG' ? '🟢 Peste Medie' : '🔴 Sub Medie'}
-- **Top Performer:** ${mock.metrics[0].topPerformer}%`;
-      }
-
-      // 5. Search/Parks
-      if (lower.includes('parc') || lower.includes('park') || lower.includes('list') || lower.includes('caut') || lower.includes('search')) {
-          const parks = searchParks(text);
-          if (onToolCall) onToolCall('searchSolarParks', { query: text });
-          return `(Offline Mode) Am găsit ${parks.length} parcuri în baza de date internă care se potrivesc criteriilor tale. (Vezi harta pentru detalii).`;
-      }
-
-      return "(Offline Mode) Nu pot contacta API-ul Gemini acum (Quota Exceeded), dar sunt operațional. Încearcă să ceri: 'Curățare', 'Anomalii', 'Vremea solară' sau 'Compară parcul'.";
-  }
-
-  async executeSpecialTool(name: string, args: any, lastImageContext?: string): Promise<{ result?: any, error?: string, sources?: GroundingSource[] }> {
+  async executeSpecialTool(name: string, args: any, lastImageContext?: string): Promise<any> {
      try {
-       // --- Image Capability Tools ---
-       if (name === 'generateImage') {
-         const img = await generateImageWithNanoBananaPro(this.apiKey, args.prompt, args.size || '1K');
-         return { result: { imageUrl: img, message: "Image generated successfully." } };
-       }
-       if (name === 'editImage') {
-         if (!lastImageContext) return { error: "No image found in context to edit. Please upload or generate an image first." };
-         const img = await editImageWithNanoBanana(this.apiKey, lastImageContext, args.prompt);
-         return { result: { imageUrl: img, message: "Image edited successfully." } };
+       // Gemini Technical Report Synthesis
+       if (name === 'generate_technical_site_report') {
+           const ai = new GoogleGenAI({ apiKey: this.apiKey });
+           const reportResponse = await ai.models.generateContent({
+               model: GEMINI_FLASH_MODEL_ID,
+               contents: `As a Senior Solar Architect, synthesize this technical telemetry: ${args.telemetrySummary}. Site: ${args.siteName}. Tone: ${args.tone}. Focus on KPIs (PR, NDVI, Soiling Losses). Use Markdown.`,
+               config: { systemInstruction: "You are the lead architect of Helios. Provide actionable, high-density technical insights." }
+           });
+           return { result: { report: reportResponse.text } };
        }
 
-       // --- Grounding Tools ---
-       if (name === 'performWebSearch') {
-           const { text, sources } = await performWebSearch(this.apiKey, args.query);
-           return { result: { summary: text }, sources };
+       // Planet Labs Premium Proxy
+       if (name === 'fetch_planet_imagery') {
+           const res = await fetchJson('/satellite/planet', {
+               method: 'POST',
+               headers: {'Content-Type': 'application/json'},
+               body: JSON.stringify(args)
+           });
+           return { result: res };
        }
-       if (name === 'performMapsSearch') {
-           const { text, sources } = await performMapsSearch(this.apiKey, args.query);
-           return { result: { summary: text }, sources };
+
+       // Panel DNA (Wrapper for SkySat)
+       if (name === 'analyze_panel_dna') {
+           const res = await fetchJson('/satellite/planet', {
+               method: 'POST',
+               headers: {'Content-Type': 'application/json'},
+               body: JSON.stringify({ ...args, source: 'skysat' })
+           });
+           return { result: res };
        }
-       if (name === 'readUrl') {
-           const content = await readUrlFromBackend(args.url);
-           return { result: { content } };
+
+       // Copernicus Satellite Integration Proxy
+       if (name === 'fetch_satellite_imagery') {
+         const { bbox, collection, startDate, endDate, cloudCover, evalscript } = args;
+         const res = await fetchJson('/satellite/imagery', { 
+           method: 'POST', 
+           headers: {'Content-Type':'application/json'}, 
+           body: JSON.stringify({ 
+             bbox, 
+             collection: collection || 'SENTINEL2', 
+             startDate, 
+             endDate,
+             cloudCover,
+             evalscript 
+           }) 
+         });
+         return { result: res };
        }
+
+       // Core Function Proxies
+       if (name === 'fetch_production_forecast') return { result: await fetchJson(`/solar/forecast?lat=${args.lat}&lng=${args.lng}&dec=${args.dec || 35}&az=${args.az || 0}&kwp=${args.kwp}`) };
+       if (name === 'fetch_biodiversity_report') return { result: await fetchJson(`/biodiversity/nearby?lat=${args.lat}&lng=${args.lng}&radius=${args.radius || 5000}`) };
+       if (name === 'calculate_carbon_impact') return { result: await fetchJson('/esg/carbon-impact', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(args) }) };
+       if (name === 'reverse_geocode') return { result: await fetchJson(`/geo/reverse?lat=${args.lat}&lng=${args.lng}`) };
        
-       // --- QUICK WIN TOOLS (With Fallbacks) ---
-       if (name === 'getCleaningSchedule') {
-           const data = await fetchJson(`/maintenance/cleaning-schedule?lat=${args.lat}&lng=${args.lng}`);
-           if (data.isConnectionError) {
-             console.warn("Using Mock Data for Cleaning Schedule");
-             return { result: MOCK_DATA.cleaning(args.lat, args.lng) };
-           }
-           return { result: data };
-       }
-       if (name === 'analyzeAnomalies') {
-           const data = await fetchJson('/analytics/anomalies');
-           if (data.isConnectionError) {
-             console.warn("Using Mock Data for Anomalies");
-             return { result: MOCK_DATA.anomalies() };
-           }
-           return { result: data };
-       }
-       if (name === 'getSolarForecast') {
-           const data = await fetchJson(`/weather/solar-forecast?lat=${args.lat}&lng=${args.lng}`);
-           if (data.isConnectionError) {
-             console.warn("Using Mock Data for Solar Forecast");
-             return { result: MOCK_DATA.forecast(args.lat, args.lng) };
-           }
-           return { result: data };
-       }
-       if (name === 'runBenchmarking') {
-           const data = await fetchJson('/benchmarking/compare');
-           if (data.isConnectionError) {
-             console.warn("Using Mock Data for Benchmarking");
-             return { result: MOCK_DATA.benchmarking() };
-           }
-           return { result: data };
-       }
+       // New Advanced Analytics Tools
+       if (name === 'fetch_performance_benchmark') return { result: await fetchJson(`/analytics/benchmark?parkId=${args.parkId}&region=${args.region || ''}`) };
+       if (name === 'analyze_predictive_failure') return { result: await fetchJson('/analytics/failure-prediction', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(args) }) };
+       if (name === 'execute_energy_trade') return { result: await fetchJson('/market/trade', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(args) }) };
+       if (name === 'plan_agrivoltaics') return { result: await fetchJson(`/geo/agrivoltaics?location=${args.location}&cropType=${args.cropType || ''}`) };
 
-     } catch (e: any) {
-       return { error: e.message };
-     }
-     return { error: "Unknown tool" };
-  }
+       // Infrastructure Tools
+       if (name === 'fetch_weather_forecast') return { result: await fetchWeatherForecast(paramsFix(args)) };
+       if (name === 'fetch_solar_radiation_forecast') return { result: await fetchWeatherForecast({...paramsFix(args), hourly: ["shortwave_radiation", "direct_normal_irradiance", "diffuse_radiation"]}) };
+       if (name === 'searchPlaces') return { result: { places: await searchPlaces(args.query) } };
+       if (name === 'searchSolarParks') return { result: { parks: searchParks(args.query), count: searchParks(args.query).length } };
+       if (name === 'runSimulation') return { result: await createSimulationJob(args.placeId, args.systemSizeKw) };
 
-  private async generate(modelId: string, contents: any[], tools: any[], systemInstruction: string) {
-      return await this.ai.models.generateContent({
-        model: modelId,
-        contents: contents,
-        config: { systemInstruction: systemInstruction, tools: tools }
-      });
+     } catch (e: any) { return { error: e.message }; }
+     return { error: "Unknown tool mapping" };
   }
 
   async sendMessage(
     text: string, 
     attachment?: Attachment, 
-    onToolCall?: (toolName: string, args: any) => void,
-    lastImageContext?: string,
-    language: Language = 'ro',
-    preferredModel: string = DEFAULT_MODEL_ID
-  ): Promise<{ text: string, generatedImage?: string, groundingSources?: GroundingSource[] }> {
+    onToolCall?: any, 
+    lastImageContext?: string, 
+    language: Language = 'ro', 
+    preferredModel: string = DEFAULT_MODEL_ID,
+    config: GeminiRequestConfig = {},
+    onStreamUpdate?: (text: string) => void
+  ): Promise<any> {
     
-    // REQUIREMENT: Must use Gemini 3 Pro for image understanding.
-    // If an attachment is present, we enforce the Pro model regardless of user preference.
-    const effectiveModelId = attachment ? GEMINI_PRO_MODEL_ID : preferredModel;
+    // --- 1. IMAGE GENERATION (Nano Banana Pro) ---
+    if (config.isImageGen && config.imageSize) {
+        const response = await withRetry<GenerateContentResponse>(() => this.ai.models.generateContent({
+            model: GEMINI_IMAGE_GEN_MODEL_ID,
+            contents: { parts: [{ text }] },
+            config: {
+                imageConfig: {
+                    imageSize: config.imageSize as any,
+                    aspectRatio: "1:1" // Default
+                }
+            }
+        }));
 
-    try {
-        return await this._sendMessageInternal(text, attachment, onToolCall, lastImageContext, language, effectiveModelId);
-    } catch (error: any) {
-        const isQuota = error.message?.includes('429') || 
-                        error.message?.includes('RESOURCE_EXHAUSTED') ||
-                        error.status === 429;
+        // Find image in response
+        let imageUrl = undefined;
+        let outputText = "Image generated successfully.";
         
-        // 1. Try Fallback to Flash if Pro fails
-        if (isQuota && effectiveModelId === GEMINI_PRO_MODEL_ID) {
-            console.warn("Pro model quota exhausted. Switching to Flash.");
-            try {
-                const fallback = await this._sendMessageInternal(text, attachment, onToolCall, lastImageContext, language, GEMINI_FLASH_MODEL_ID);
-                fallback.text += "\n\n(Note: Switched to Flash model due to high traffic.)";
-                return fallback;
-            } catch (flashError: any) {
-                // If Flash also fails, go to Step 2 (Offline Mode)
-                console.warn("Flash model also failed. Entering Offline Mode.");
+        for (const candidate of response.candidates || []) {
+            for (const part of candidate.content.parts) {
+                if (part.inlineData) {
+                    imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                } else if (part.text) {
+                    outputText = part.text;
+                }
+            }
+        }
+        
+        return { text: outputText, generatedImage: imageUrl };
+    }
+
+    // --- 2. IMAGE EDITING (Nano Banana) ---
+    if (config.isImageEdit && config.editContext) {
+        const response = await withRetry<GenerateContentResponse>(() => this.ai.models.generateContent({
+            model: GEMINI_IMAGE_EDIT_MODEL_ID,
+            contents: {
+                parts: [
+                    { inlineData: { mimeType: config.editContext!.mimeType, data: config.editContext!.data } },
+                    { text }
+                ]
+            }
+        }));
+
+        let imageUrl = undefined;
+        let outputText = "Image edited successfully.";
+        
+        for (const candidate of response.candidates || []) {
+             for (const part of candidate.content.parts) {
+                 if (part.inlineData) {
+                     imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+                 } else if (part.text) {
+                     outputText = part.text;
+                 }
+             }
+        }
+        return { text: outputText, generatedImage: imageUrl };
+    }
+
+    // --- 3. STANDARD CHAT & ANALYSIS (STREAMING) ---
+    
+    // Determine Model and Config
+    let effectiveModelId = preferredModel;
+    let effectiveConfig: any = {
+        systemInstruction: language === 'ro' ? SYSTEM_INSTRUCTION_RO : SYSTEM_INSTRUCTION_EN,
+    };
+
+    // Force Pro Model for Analysis or Thinking
+    if (attachment || config.isThinking) {
+        effectiveModelId = GEMINI_PRO_MODEL_ID;
+    }
+
+    // Thinking Config
+    if (config.isThinking) {
+        effectiveConfig.thinkingConfig = { thinkingBudget: 32768 };
+        // Important: Do not set maxOutputTokens when using thinking
+    }
+
+    // Attach Tools (Only for standard chat, not image gen)
+    effectiveConfig.tools = [{ 
+      functionDeclarations: [
+        generateSiteReportTool, fetchPlanetImageryTool, fetchSatelliteImageryTool, 
+        fetchProductionForecastTool, fetchBiodiversityReportTool, calculateCarbonImpactTool, 
+        reverseGeocodeTool, searchPlacesTool, searchSolarParksTool, 
+        runSimulationTool, fetchWeatherForecastTool, fetchSolarRadiationForecastTool,
+        fetchPerformanceBenchmarkTool, analyzePredictiveFailureTool, executeEnergyTradeTool,
+        planAgrivoltaicsTool, analyzePanelDnaTool
+      ] 
+    }];
+
+    const userParts: any[] = [{ text }];
+    if (attachment) userParts.push({ inlineData: { mimeType: attachment.mimeType, data: attachment.data } });
+    
+    // Push user message to history
+    this.history.push({ role: 'user', parts: userParts });
+
+    let finalGeneratedText = '';
+    let finalExtractedImage: string | undefined = undefined;
+    let finalGroundingSources: any[] = [];
+    
+    // Recursive loop to handle multiple tool turns
+    let keepGoing = true;
+    while (keepGoing) {
+        keepGoing = false; // Assume we stop unless we find a function call
+        
+        // Execute stream. Note: stream is iterable directly.
+        const stream = await withRetry(() => this.ai.models.generateContentStream({ 
+            model: effectiveModelId, 
+            contents: this.history, 
+            config: effectiveConfig 
+        })) as any;
+
+        const rawPartsFromStream: any[] = [];
+
+        // Iterate through the stream for UI updates and accumulating parts
+        for await (const chunk of stream) {
+            // 1. Text Update (Streaming to UI)
+            // Manual extraction to avoid SDK warnings about FunctionCall parts in .text
+            let chunkText = '';
+            const candidate = chunk.candidates?.[0];
+            
+            if (candidate?.content?.parts) {
+                for (const part of candidate.content.parts) {
+                    if (part.text) {
+                        chunkText += part.text;
+                    }
+                }
+            }
+
+            if (chunkText) {
+                finalGeneratedText += chunkText; // Aggregate for final result
+                if (onStreamUpdate) onStreamUpdate(finalGeneratedText);
+            }
+            
+            // 2. Capture Grounding Metadata (if any)
+            if (candidate?.groundingMetadata?.groundingChunks) {
+                finalGroundingSources = candidate.groundingMetadata.groundingChunks.map((chunk: any) => ({
+                    title: chunk.web?.title || chunk.maps?.title,
+                    uri: chunk.web?.uri || chunk.maps?.uri,
+                    type: chunk.web ? 'web' : 'map'
+                }));
+            }
+
+            // 3. Collect Raw Parts (Important for thought signatures)
+            if (candidate?.content?.parts) {
+                rawPartsFromStream.push(...candidate.content.parts);
             }
         }
 
-        // 2. Offline Fallback Mode
-        // If we are here, either Pro failed (and we didn't try Flash because attachment required Pro)
-        // OR both failed.
-        if (isQuota || error.status === 503) {
-             const offlineResponse = await this.getFallbackResponse(text, onToolCall);
-             return { text: offlineResponse };
+        // --- RECONSTRUCT HISTORY WITH THOUGHT SIGNATURES ---
+        // We merge consecutive text parts to reduce noise, but preserve thought and functionCall parts as is.
+        const mergedParts: any[] = [];
+        let currentTextPart: any = null;
+
+        for (const part of rawPartsFromStream) {
+            if (part.text && !part.thought) { // Standard text part
+                if (currentTextPart) {
+                    currentTextPart.text += part.text;
+                } else {
+                    currentTextPart = { text: part.text };
+                    mergedParts.push(currentTextPart);
+                }
+            } else {
+                // Thought part or FunctionCall part
+                // Reset currentTextPart because this is a break in the text flow
+                currentTextPart = null; 
+                mergedParts.push(part);
+            }
         }
 
-        throw error;
+        // Push Model Turn to History
+        this.history.push({ role: 'model', parts: mergedParts });
+
+        // Check for function calls in the reconstructed parts
+        // Note: Function calls are parts with `functionCall` property
+        const functionCalls = mergedParts.filter(p => p.functionCall).map(p => p.functionCall);
+
+        // Process Function Calls if any
+        if (functionCalls.length > 0) {
+            const functionResponses = [];
+            for (const fc of functionCalls) {
+                if (onToolCall) onToolCall(fc.name, fc.args);
+                
+                const sr = await this.executeSpecialTool(fc.name, fc.args, lastImageContext);
+                
+                if (sr.result?.visualUrl) {
+                    finalExtractedImage = sr.result.visualUrl;
+                }
+
+                functionResponses.push({ 
+                    functionResponse: { 
+                        name: fc.name, 
+                        response: { result: sr.result || { error: sr.error } } 
+                    } 
+                });
+            }
+            
+            // Push Tool Responses (User role in API v1beta/v1) to history
+            this.history.push({ role: 'user', parts: functionResponses });
+            
+            // Continue the loop to get the model's next response (interpretation of tool results)
+            keepGoing = true;
+            // Add a separator for the UI stream if desired, or just continue appending
+            finalGeneratedText += "\n"; 
+        }
     }
+
+    return { 
+      text: finalGeneratedText, 
+      generatedImage: finalExtractedImage,
+      groundingSources: finalGroundingSources
+    };
   }
+}
 
-  private async _sendMessageInternal(
-    text: string, 
-    attachment: Attachment | undefined, 
-    onToolCall: ((toolName: string, args: any) => void) | undefined,
-    lastImageContext: string | undefined,
-    language: Language,
-    modelId: string
-  ): Promise<{ text: string, generatedImage?: string, groundingSources?: GroundingSource[] }> {
-
-      const systemInstruction = language === 'ro' ? SYSTEM_INSTRUCTION_RO : SYSTEM_INSTRUCTION_EN;
-      const userParts: any[] = [{ text }];
-      if (attachment) userParts.push({ inlineData: { mimeType: attachment.mimeType, data: attachment.data } });
-
-      this.history.push({ role: 'user', parts: userParts });
-
-      const tools = [{ 
-        functionDeclarations: [
-          searchPlacesTool, searchSolarParksTool, performWebSearchTool, performMapsSearchTool,
-          readUrlTool, analyzeRoofTool, runSimulationTool, checkLicenseTool, 
-          // Image Tools
-          generateImageTool, editImageTool,
-          // Quick Wins
-          getCleaningScheduleTool, analyzeAnomaliesTool, getSolarForecastTool, runBenchmarkingTool
-        ] 
-      }];
-      
-      let currentResponse = await withRetry(() => this.generate(modelId, this.history, tools, systemInstruction));
-      let finalGeneratedImage: string | undefined;
-      let finalGroundingSources: GroundingSource[] = [];
-
-      while (currentResponse.candidates?.[0]?.content?.parts?.some(p => p.functionCall)) {
-        const parts = currentResponse.candidates[0].content.parts;
-        this.history.push({ role: 'model', parts: parts }); 
-        const functionResponses = [];
-
-        for (const part of parts) {
-          if (part.functionCall) {
-            const { name, args } = part.functionCall;
-            if (onToolCall) onToolCall(name, args);
-
-            let result: any = { error: "Unknown tool" };
-            const specialTools = [
-                'generateImage', 'editImage', 'performWebSearch', 'performMapsSearch', 'readUrl',
-                'getCleaningSchedule', 'analyzeAnomalies', 'getSolarForecast', 'runBenchmarking'
-            ];
-
-            try {
-              if (specialTools.includes(name)) {
-                 const sr = await this.executeSpecialTool(name, args, lastImageContext);
-                 if (sr.result) {
-                   result = sr.result;
-                   if (result.imageUrl) finalGeneratedImage = result.imageUrl;
-                   if (sr.sources) finalGroundingSources = [...finalGroundingSources, ...sr.sources];
-                 } else {
-                   result = { error: sr.error };
-                 }
-              } 
-              else if (name === 'searchPlaces') {
-                const places = await searchPlaces(args.query as string);
-                result = { places: places.map(p => ({ id: p.id, name: p.name, address: p.address, image: p.imageUrl })) };
-              } else if (name === 'searchSolarParks') {
-                const parks = searchParks(args.query as string);
-                result = { 
-                    count: parks.length,
-                    parks: parks,
-                    places: parks.map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        address: `${p.county} (${p.capacityMw} MW)`,
-                        location: p.location,
-                        type: 'solar_park',
-                        imageUrl: `https://picsum.photos/seed/${p.id}solar/800/600` 
-                    }))
-                };
-              } else if (name === 'analyzeRoof') {
-                const analysis = await analyzeRoofImage(args.imageUrl as string);
-                result = { analysis };
-              } else if (name === 'runSimulation') {
-                const job = await createSimulationJob(args.placeId as string, args.systemSizeKw as number, args.project as string, args.variant as string, args.tilt as number, args.azimuth as number, args.modulePower as number);
-                result = { jobId: job.id, status: job.status, message: "Simulation started." };
-              } else if (name === 'checkLicense') {
-                  const status = await getLicenseInfo();
-                  result = { status };
-              }
-            } catch (e: any) { result = { error: e.message }; }
-
-            functionResponses.push({ functionResponse: { name: name, response: { result: result } } });
-          }
-        }
-        this.history.push({ role: 'user', parts: functionResponses });
-        currentResponse = await withRetry(() => this.generate(modelId, this.history, tools, systemInstruction));
-      }
-
-      const finalText = currentResponse.text || "Processed.";
-      this.history.push({ role: 'model', parts: [{ text: finalText }] });
-      return { text: finalText, generatedImage: finalGeneratedImage, groundingSources: finalGroundingSources.length > 0 ? finalGroundingSources : undefined };
-  }
+// Utility to ensure param consistency for Open-Meteo
+function paramsFix(args: any) {
+    return {
+        latitude: args.latitude || args.lat,
+        longitude: args.longitude || args.lng,
+        ...args
+    };
 }

@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import ChatInterface from './components/ChatInterface';
 import MapView from './components/MapView';
 import SimulationStatusPanel from './components/SimulationStatus';
 import PVsystPanel from './components/PVsystPanel';
+import ToolsPanel from './components/ToolsPanel';
 import { ToolCallLog, Language } from './types';
 import { t } from './translations';
 import { DEFAULT_MODEL_ID, GEMINI_FLASH_MODEL_ID, GEMINI_PRO_MODEL_ID } from './constants';
@@ -11,7 +13,7 @@ export default function App() {
   const [activeToolLog, setActiveToolLog] = useState<ToolCallLog | null>(null);
   const [activeJobIds, setActiveJobIds] = useState<string[]>([]);
   const [logs, setLogs] = useState<ToolCallLog[]>([]);
-  const [viewMode, setViewMode] = useState<'map' | 'pvsyst'>('map');
+  const [viewMode, setViewMode] = useState<'map' | 'pvsyst' | 'tools'>('map');
   const [lang, setLang] = useState<Language>('ro'); // Default to Romanian
   const [activeModel, setActiveModel] = useState<string>(DEFAULT_MODEL_ID);
 
@@ -19,7 +21,6 @@ export default function App() {
     setActiveToolLog(log);
     setLogs(prev => [log, ...prev]);
 
-    // If the tool is starting a simulation, track the Job ID
     if (log.toolName === 'runSimulation' && log.result && !log.result.error) {
         if (log.result.jobId) {
             setActiveJobIds(prev => [...prev, log.result.jobId]);
@@ -30,10 +31,8 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
       
-      {/* LEFT: Dashboard & Visualization */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         
-        {/* Top Bar */}
         <header className="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded bg-gradient-to-br from-primary-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">H</div>
@@ -41,7 +40,6 @@ export default function App() {
           </div>
           <div className="flex gap-4 items-center">
              
-             {/* Model Selector */}
              <div className="flex items-center bg-slate-900 rounded border border-slate-700 overflow-hidden mr-2">
                 <button 
                     onClick={() => setActiveModel(GEMINI_FLASH_MODEL_ID)}
@@ -71,8 +69,13 @@ export default function App() {
              >
                 {t(lang, 'app', 'pvsystBtn')}
              </button>
+             <button 
+                onClick={() => setViewMode('tools')}
+                className={`text-xs font-mono px-3 py-1 rounded transition-colors ${viewMode === 'tools' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-white'}`}
+             >
+                {t(lang, 'app', 'toolsBtn')}
+             </button>
 
-             {/* Language Switcher */}
              <div className="ml-4 flex items-center bg-slate-900 rounded border border-slate-700 overflow-hidden">
                 <button 
                     onClick={() => setLang('ro')}
@@ -90,10 +93,8 @@ export default function App() {
           </div>
         </header>
 
-        {/* Content Grid */}
         <div className="flex-1 grid grid-rows-2 p-6 gap-6 overflow-hidden">
             
-            {/* Row 1: Primary View */}
             <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden relative shadow-2xl">
                 {viewMode === 'map' ? (
                    <>
@@ -102,17 +103,19 @@ export default function App() {
                     </div>
                     <MapView activeToolLog={activeToolLog} lang={lang} />
                    </>
-                ) : (
+                ) : viewMode === 'pvsyst' ? (
                     <div className="h-full w-full p-4">
                         <h2 className="text-sm font-mono text-emerald-500 uppercase mb-4">{t(lang, 'pvsyst', 'title')}</h2>
                         <PVsystPanel lang={lang} />
                     </div>
+                ) : (
+                    <div className="h-full w-full p-6">
+                        <ToolsPanel lang={lang} />
+                    </div>
                 )}
             </div>
 
-            {/* Row 2: Analytics & Job Queue */}
             <div className="grid grid-cols-2 gap-6 min-h-0">
-                {/* Simulation Queue */}
                 <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex flex-col overflow-hidden">
                      <h3 className="text-xs font-mono text-primary-400 uppercase mb-4 flex justify-between">
                         <span>{t(lang, 'app', 'jobQueue')}</span>
@@ -123,7 +126,6 @@ export default function App() {
                      </div>
                 </div>
 
-                {/* System Activity Log */}
                 <div className="bg-slate-900 rounded-xl border border-slate-800 p-4 flex flex-col overflow-hidden">
                     <h3 className="text-xs font-mono text-slate-400 uppercase mb-4">{t(lang, 'app', 'eventsTitle')}</h3>
                     <div className="flex-1 overflow-y-auto font-mono text-xs space-y-3 custom-scrollbar">
@@ -148,7 +150,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* RIGHT: Chat Interface */}
       <div className="w-[450px] shadow-2xl z-20">
         <ChatInterface onToolActivity={handleToolActivity} lang={lang} activeModel={activeModel} />
       </div>

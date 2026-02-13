@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Message, ToolCallLog, Language, Attachment } from '../types';
-import { GeminiOrchestrator } from '../services/geminiService';
+import { Message, ToolCallLog, Language, Attachment, ImageSize } from '../types';
+import { GeminiOrchestrator, GeminiRequestConfig } from '../services/geminiService';
 import { t } from '../translations';
 import { DEFAULT_MODEL_ID, GEMINI_PRO_MODEL_ID } from '../constants';
 
@@ -17,17 +17,18 @@ interface ChatInterfaceProps {
   activeModel: string;
 }
 
-const QUICK_ACTIONS = [
-  { id: 'anomalies', label: 'Anomalies', icon: '🧠', prompt: 'Run a full system anomaly analysis (analyzeAnomalies).' },
-  { id: 'cleaning', label: 'Cleaning', icon: '🧹', prompt: 'Check cleaning schedule (getCleaningSchedule) for current location.' },
-  { id: 'forecast', label: 'Forecast', icon: '🌤️', prompt: 'Get solar forecast for Bucharest (lat 44.4, lng 26.1) to test DNI/DHI.' },
-  { id: 'benchmark', label: 'Benchmark', icon: '📊', prompt: 'Run fleet benchmarking (runBenchmarking).' },
-];
-
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, activeModel }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Advanced Features State
+  const [isThinkingEnabled, setIsThinkingEnabled] = useState(false);
+  const [showGenModal, setShowGenModal] = useState(false);
+  const [genParams, setGenParams] = useState<{ prompt: string, size: ImageSize }>({ prompt: '', size: '1K' });
+  
+  // Image Editing Context
+  const [editingImage, setEditingImage] = useState<{ data: string, mimeType: string, source: 'upload'|'gen' } | null>(null);
   
   // Voice State
   const [isListening, setIsListening] = useState(false);
@@ -43,6 +44,44 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
   const orchestratorRef = useRef<GeminiOrchestrator | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const QUICK_ACTIONS = [
+    { 
+      id: 'planet_template', 
+      label: lang === 'ro' ? 'Monitorizare SkySat 50cm' : 'SkySat 50cm Monitor', 
+      icon: '🌍', 
+      prompt: lang === 'ro' ? 'Activează monitorizarea SkySat (50cm) cu max 5% nori și benzile NIR, Red, Blue pentru analiza vegetației.' : 'Trigger SkySat (50cm) monitoring with max 5% cloud cover and retrieve NIR, Red, and Blue bands for precision analysis.' 
+    },
+    { 
+      id: 'satellite_template', 
+      label: lang === 'ro' ? 'Analiză Satelitară' : 'Satellite Analysis', 
+      icon: '🛰️', 
+      prompt: lang === 'ro' ? 'Efectuează o analiză satelitară Sentinel pentru acest proiect. Calculează indicele NDVI și raportează riscurile de vegetație sau anomalii termice în perimetru.' : 'Perform a comprehensive satellite analysis for this project. Calculate NDVI vegetation health indices and report any thermal anomalies or environmental risks in the area.' 
+    },
+    { 
+      id: 'anomalies_template', 
+      label: lang === 'ro' ? 'Detecție Anomalii' : 'Anomaly Detection', 
+      icon: '🧠', 
+      prompt: lang === 'ro' ? 'Rulează o analiză completă de anomalii de sistem. Compară telemetria actuală cu valorile așteptate și identifică pierderile de performanță.' : 'Run a full system anomaly analysis. Compare current telemetry with expected generation values and identify specific performance gaps or equipment failures.' 
+    },
+    { 
+      id: 'audit_template', 
+      label: lang === 'ro' ? 'Audit Tehnic' : 'Technical Audit', 
+      icon: '📊', 
+      prompt: lang === 'ro' ? 'Generează un raport tehnic complet (Site Report). Sintetizează datele PVsyst, prognoza meteo curentă și impactul ESG într-un rezumat executiv.' : 'Generate a comprehensive technical site audit. Synthesize PVsyst simulation data, current meteo forecasts, and ESG impact metrics into an executive summary.' 
+    },
+  ];
+
+  // Listen for report generation triggers from other components
+  useEffect(() => {
+    const handleReportTrigger = (e: any) => {
+        const { siteName, data } = e.detail;
+        const prompt = `Please generate a comprehensive technical site report for ${siteName}. Use the generate_technical_site_report tool with the following context: ${JSON.stringify(data)}`;
+        handleSend(prompt);
+    };
+    window.addEventListener('helios-report-trigger', handleReportTrigger);
+    return () => window.removeEventListener('helios-report-trigger', handleReportTrigger);
+  }, []);
 
   // Reset/Init welcome message when language changes
   useEffect(() => {
@@ -70,8 +109,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
 
     if (Recognition) {
       const recognition = new Recognition();
-      recognition.continuous = false; // Stop after one sentence/pause
-      recognition.interimResults = true; // Show results as we speak
+      recognition.continuous = false; 
+      recognition.interimResults = true; 
       recognition.lang = lang === 'ro' ? 'ro-RO' : 'en-US';
 
       recognition.onstart = () => {
@@ -88,9 +127,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           transcript += event.results[i][0].transcript;
         }
-        // Append to existing input if user pauses and speaks again in same session, 
-        // but for continuous=false, it usually resets. 
-        // Here we just set the input to the current result.
         setInput(transcript);
       };
 
@@ -118,7 +154,45 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isLoading]); // Scroll when messages change or loading state (for typing indicator)
+
+  const handleSaveChat = () => {
+    if (messages.length === 0) return;
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    let content = `# Smart Helios Chat Export - ${new Date().toLocaleString()}\n\n`;
+
+    messages.forEach(msg => {
+      const time = new Date(msg.timestamp).toLocaleTimeString();
+      const role = msg.role === 'model' ? '🤖 SMART HELIOS' : (msg.role === 'user' ? '👤 USER' : '⚙️ SYSTEM');
+      
+      content += `### ${role} [${time}]\n`;
+      content += `${msg.content}\n`;
+      
+      if (msg.attachment) {
+         content += `\n*[Attachment: ${msg.attachment.name} (${msg.attachment.mimeType})]*\n`;
+      }
+      
+      if (msg.groundingSources && msg.groundingSources.length > 0) {
+         content += `\n> **Sources:**\n`;
+         msg.groundingSources.forEach(s => {
+             content += `> - [${s.title || 'Link'}](${s.uri})\n`;
+         });
+      }
+      
+      content += `\n---\n\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `helios-chat-${timestamp}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -127,7 +201,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
       
       reader.onload = (event) => {
         const base64String = event.target?.result as string;
-        // Strip prefix for data extraction, but keep full string for preview if image
         const data = base64String.split(',')[1]; 
         
         setSelectedFile({
@@ -135,17 +208,45 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
             mimeType: file.type,
             data: data
         });
+        
+        // Reset editing state if new file uploaded, user must explicitly click "Edit"
+        setEditingImage(null);
       };
       
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSend = async (overrideText?: string) => {
+  const handleEditImage = (imageData: string, mimeType: string) => {
+      // Remove data:image/png;base64, prefix if present
+      const base64 = imageData.includes('base64,') ? imageData.split('base64,')[1] : imageData;
+      setEditingImage({ data: base64, mimeType, source: 'gen' });
+      setInput(''); // Clear input for prompt
+      setSelectedFile(null); // Clear selection as we are moving to edit mode
+      
+      // Focus input
+      setTimeout(() => {
+        const inputEl = document.querySelector('input[type="text"]') as HTMLInputElement;
+        if(inputEl) inputEl.focus();
+      }, 100);
+  };
+
+  const handleGenerateImage = () => {
+      if (!genParams.prompt) return;
+      setShowGenModal(false);
+      
+      const config: GeminiRequestConfig = {
+          isImageGen: true,
+          imageSize: genParams.size
+      };
+      
+      handleSend(genParams.prompt, config);
+  };
+
+  const handleSend = async (overrideText?: string, customConfig?: GeminiRequestConfig) => {
     const textToSend = overrideText || input;
     if ((!textToSend.trim() && !selectedFile) || isLoading) return;
     
-    // Stop listening if we hit send manually
     if (isListening) {
         recognitionRef.current?.stop();
     }
@@ -168,7 +269,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
       timestamp: Date.now()
     };
 
-    // If image, update context for potential editing
     if (selectedFile && selectedFile.mimeType.startsWith('image/')) {
         setLastContextImage(`data:${selectedFile.mimeType};base64,${selectedFile.data}`);
     }
@@ -178,12 +278,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
     setSelectedFile(null);
     setIsLoading(true);
 
+    // Create a placeholder message for the streaming response
+    const streamingMsgId = (Date.now() + 1).toString();
+    const placeholderMsg: Message = {
+      id: streamingMsgId,
+      role: 'model',
+      content: '', // Starts empty
+      timestamp: Date.now()
+    };
+    
+    setMessages(prev => [...prev, placeholderMsg]);
+
     try {
-      // Pass activeModel to sendMessage
+      // Prepare Config
+      const config: GeminiRequestConfig = customConfig || {
+          isThinking: isThinkingEnabled,
+          isImageEdit: !!editingImage,
+          editContext: editingImage ? { data: editingImage.data, mimeType: editingImage.mimeType } : undefined
+      };
+
       const response = await orchestratorRef.current.sendMessage(
           textToSend, 
           userMsg.attachment,
-          (toolName, args) => {
+          (toolName: any, args: any) => {
             onToolActivity({
                 toolName,
                 args,
@@ -193,24 +310,45 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
           },
           lastContextImage,
           lang,
-          activeModel
+          activeModel,
+          config,
+          (streamedText) => {
+              // Update the message content in real-time
+              setMessages(prevMessages => 
+                  prevMessages.map(msg => 
+                      msg.id === streamingMsgId 
+                      ? { ...msg, content: streamedText } 
+                      : msg
+                  )
+              );
+          }
       );
 
       if (response.generatedImage) {
           setLastContextImage(response.generatedImage);
       }
 
-      const modelMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        content: response.text,
-        image: response.generatedImage, 
-        groundingSources: response.groundingSources,
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, modelMsg]);
+      // If we were editing, clear the editing state after sending
+      if (editingImage) {
+          setEditingImage(null);
+      }
+
+      // Final update to ensure everything is synced (image, grounding, final text)
+      setMessages(prevMessages => 
+          prevMessages.map(msg => 
+              msg.id === streamingMsgId 
+              ? { 
+                  ...msg, 
+                  content: response.text, // Ensure final text matches
+                  image: response.generatedImage, 
+                  groundingSources: response.groundingSources 
+                } 
+              : msg
+          )
+      );
 
     } catch (error) {
+      // Remove the placeholder if it was empty, or append error
       const isQuotaError = error instanceof Error && 
         (error.message.includes('429') || error.message.includes('RESOURCE_EXHAUSTED'));
       
@@ -219,12 +357,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
         : `${t(lang, 'chat', 'error')}: ${error instanceof Error ? error.message : 'Unknown error'}`;
 
       const errorMsg: Message = {
-        id: (Date.now() + 1).toString(),
+        id: (Date.now() + 2).toString(),
         role: 'system',
         content: content,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMsg]);
+      
+      // Optionally remove the stuck streaming message if it had no content
+      setMessages(prev => prev.filter(m => m.id !== streamingMsgId || m.content.length > 0));
+
     } finally {
       setIsLoading(false);
     }
@@ -234,7 +376,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
       const isImage = attachment.mimeType.startsWith('image/');
       if (isImage) {
           return (
-              <div className="mb-2 rounded overflow-hidden border border-black/20 max-w-xs">
+              <div className="mb-2 rounded overflow-hidden border border-black/20 max-w-xs relative group">
                   <img src={`data:${attachment.mimeType};base64,${attachment.data}`} alt="attachment" className="w-full h-auto" />
               </div>
           );
@@ -253,12 +395,90 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border-l border-slate-800">
+    <div className="flex flex-col h-full bg-slate-900 border-l border-slate-800 relative">
+      
+      {/* --- IMAGE GENERATION MODAL --- */}
+      {showGenModal && (
+          <div className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur flex items-center justify-center p-6">
+              <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+                  <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                          <span className="text-xl">🎨</span> Generate Image
+                      </h3>
+                      <button onClick={() => setShowGenModal(false)} className="text-slate-500 hover:text-white">✕</button>
+                  </div>
+                  
+                  <div>
+                      <label className="text-xs text-slate-400 font-mono uppercase mb-2 block">Model</label>
+                      <div className="bg-slate-800 p-2 rounded text-sm text-indigo-400 font-bold border border-indigo-500/30 flex justify-between items-center">
+                          <span>Nano Banana Pro (Gemini 3 Pro)</span>
+                          <span className="text-[10px] bg-indigo-900 px-1.5 py-0.5 rounded text-indigo-200">VISION</span>
+                      </div>
+                  </div>
+
+                  <div>
+                      <label className="text-xs text-slate-400 font-mono uppercase mb-2 block">Prompt</label>
+                      <textarea 
+                        className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-sm focus:border-indigo-500 focus:outline-none h-24 resize-none"
+                        placeholder="Describe the image you want to generate..."
+                        value={genParams.prompt}
+                        onChange={(e) => setGenParams({...genParams, prompt: e.target.value})}
+                      />
+                  </div>
+                  
+                  <div>
+                      <label className="text-xs text-slate-400 font-mono uppercase mb-2 block">Size</label>
+                      <div className="flex gap-2">
+                          {(['1K', '2K', '4K'] as ImageSize[]).map(size => (
+                              <button
+                                key={size}
+                                onClick={() => setGenParams({...genParams, size})}
+                                className={`flex-1 py-2 rounded font-mono text-sm border transition-all ${genParams.size === size ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
+                              >
+                                  {size}
+                              </button>
+                          ))}
+                      </div>
+                  </div>
+
+                  <button 
+                    onClick={handleGenerateImage}
+                    disabled={!genParams.prompt}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-lg shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                  >
+                    GENERATE
+                  </button>
+              </div>
+          </div>
+      )}
+
       <div className="p-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur-sm sticky top-0 z-10 flex justify-between items-center">
         <h2 className="text-sm font-mono font-semibold text-primary-400 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           HELIOS ORCHESTRATOR
         </h2>
+        
+        <div className="flex items-center gap-3">
+             {/* Thinking Toggle */}
+            <div className="flex items-center gap-2 bg-slate-800 rounded-full px-1 py-0.5 border border-slate-700">
+                <button
+                    onClick={() => setIsThinkingEnabled(!isThinkingEnabled)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1 ${isThinkingEnabled ? 'bg-violet-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                    title="Enable Deep Thinking Mode (Gemini 3 Pro + 32k Budget)"
+                >
+                    <span className="text-xs">🧠</span> THINK
+                </button>
+            </div>
+
+            <button
+                onClick={handleSaveChat}
+                disabled={messages.length === 0}
+                className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title={t(lang, 'chat', 'saveChat')}
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
@@ -277,22 +497,40 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
               }`}
             >
               {msg.role === 'model' && (
-                <div className="mb-1 text-xs text-primary-400 font-mono font-bold">{t(lang, 'chat', 'agentName')}</div>
+                <div className="mb-1 text-xs text-primary-400 font-mono font-bold flex justify-between items-center">
+                    <span>{t(lang, 'chat', 'agentName')}</span>
+                </div>
               )}
               
-              {/* Render Attachments (User) */}
               {msg.attachment && renderAttachmentPreview(msg.attachment)}
 
-              {/* Render Images (Model Generated) */}
               {msg.image && (
-                <div className="mb-3 rounded overflow-hidden border border-black/20">
+                <div className="mb-3 rounded overflow-hidden border border-black/20 relative group">
                     <img src={msg.image} alt="content" className="max-w-full h-auto" />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button 
+                            onClick={() => {
+                                const a = document.createElement('a');
+                                a.href = msg.image!;
+                                a.download = `helios-gen-${Date.now()}.png`;
+                                a.click();
+                            }}
+                            className="bg-white text-black text-xs font-bold px-3 py-2 rounded-full hover:scale-105 transition-transform"
+                        >
+                            Download
+                        </button>
+                        <button 
+                            onClick={() => handleEditImage(msg.image!, 'image/png')}
+                            className="bg-indigo-600 text-white text-xs font-bold px-3 py-2 rounded-full hover:scale-105 transition-transform flex items-center gap-1"
+                        >
+                            <span>✏️</span> Edit
+                        </button>
+                    </div>
                 </div>
               )}
 
               <div className="whitespace-pre-wrap">{msg.content}</div>
 
-              {/* Render Grounding Sources */}
               {msg.groundingSources && msg.groundingSources.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-slate-700/50">
                       <p className="text-[10px] uppercase font-bold text-slate-500 mb-2">{t(lang, 'chat', 'sources')}</p>
@@ -319,7 +557,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
             </div>
           </div>
         ))}
-        {isLoading && (
+        
+        {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'model' && messages[messages.length - 1].content === '' && (
             <div className="flex justify-start animate-pulse">
                 <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
                     <div className="flex gap-1">
@@ -335,8 +574,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
 
       <div className="p-4 bg-slate-950 border-t border-slate-800">
         
-        {/* --- QUICK ACTIONS BAR --- */}
-        <div className="flex gap-2 mb-3 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1 no-scrollbar items-center">
+            {/* Image Gen Button */}
+            <button
+                onClick={() => setShowGenModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-900/30 hover:bg-indigo-900/50 border border-indigo-500/30 hover:border-indigo-400 rounded-full text-xs transition-all whitespace-nowrap group text-indigo-300"
+            >
+                <span>🎨</span>
+                <span className="font-bold">GENERATE IMAGE</span>
+            </button>
+
             {QUICK_ACTIONS.map(action => (
                 <button
                     key={action.id}
@@ -350,7 +597,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
             ))}
         </div>
 
-        {selectedFile && (
+        {/* Editing Context Indicator */}
+        {editingImage && (
+             <div className="mb-2 flex items-center gap-2 bg-indigo-900/20 p-2 rounded border border-indigo-500/50 w-fit animate-in slide-in-from-bottom-2 fade-in">
+                <img src={`data:${editingImage.mimeType};base64,${editingImage.data}`} alt="Editing" className="w-8 h-8 object-cover rounded" />
+                <div className="flex flex-col">
+                    <span className="text-xs text-indigo-300 font-bold">EDITING MODE</span>
+                    <span className="text-[10px] text-indigo-400/70">Using Gemini 2.5 Flash Image</span>
+                </div>
+                <button 
+                    onClick={() => setEditingImage(null)}
+                    className="ml-2 text-indigo-400 hover:text-white"
+                >
+                    ✕
+                </button>
+            </div>
+        )}
+
+        {selectedFile && !editingImage && (
             <div className="mb-2 flex items-center gap-2 bg-slate-900 p-2 rounded border border-slate-700 w-fit">
                 {selectedFile.mimeType.startsWith('image/') ? (
                     <img src={`data:${selectedFile.mimeType};base64,${selectedFile.data}`} alt="Preview" className="w-8 h-8 object-cover rounded" />
@@ -363,10 +627,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
                     <span className="text-xs text-slate-300 font-medium max-w-[200px] truncate">{selectedFile.name}</span>
                     <span className="text-[10px] text-slate-500">{t(lang, 'chat', 'fileAttached')}</span>
                 </div>
-                {/* Visual indicator that PRO model will be used for image */}
                 <span className="ml-2 text-[10px] bg-indigo-900/50 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-700/50 font-mono">
-                    PRO MODEL
+                    PRO VISION
                 </span>
+
+                {/* Switch to Edit Mode Button */}
+                {selectedFile.mimeType.startsWith('image/') && (
+                    <button 
+                        onClick={() => handleEditImage(selectedFile.data, selectedFile.mimeType)}
+                        className="ml-2 flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-0.5 rounded text-[10px] font-bold transition-colors"
+                        title="Use text prompts to edit this image (Gemini 2.5 Flash)"
+                    >
+                        <span>✨</span> Enter Edit Mode
+                    </button>
+                )}
+
                 <button 
                     onClick={() => setSelectedFile(null)}
                     className="ml-2 text-slate-500 hover:text-red-400"
@@ -376,7 +651,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
             </div>
         )}
 
-        {/* --- VOICE FEEDBACK OVERLAY --- */}
         {isListening && (
             <div className="mb-2 flex items-center gap-3 animate-pulse text-primary-400 bg-primary-900/20 px-3 py-1.5 rounded-full w-fit">
                 <span className="relative flex h-3 w-3">
@@ -394,7 +668,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
         )}
 
         <div className="relative flex gap-2">
-          {/* --- MIC BUTTON --- */}
           <button
             onClick={toggleListening}
             className={`p-3 rounded-lg border transition-all duration-200 group ${
@@ -405,10 +678,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
             title={t(lang, 'chat', 'tapToSpeak')}
           >
              {isListening ? (
-                 // Stop Icon
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
              ) : (
-                 // Mic Icon
                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
              )}
           </button>
@@ -424,15 +695,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
             type="file" 
             ref={fileInputRef} 
             onChange={handleFileSelect} 
-            // Accept images, PDFs, Excel, Word, PPT
             accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" 
             className="hidden" 
           />
           
           <input
             type="text"
-            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg pl-4 pr-12 py-3 text-sm focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-all text-white placeholder-slate-500 font-mono"
-            placeholder={isListening ? t(lang, 'chat', 'listening') : t(lang, 'chat', 'placeholder')}
+            className={`flex-1 bg-slate-900 border border-slate-700 rounded-lg pl-4 pr-12 py-3 text-sm focus:outline-none focus:ring-1 transition-all text-white placeholder-slate-500 font-mono ${
+                editingImage ? 'focus:border-indigo-500 focus:ring-indigo-500 border-indigo-500/30' : 'focus:border-primary-500 focus:ring-primary-500'
+            }`}
+            placeholder={editingImage ? "Enter instructions to edit the image (e.g., 'Add a retro filter')..." : (isListening ? t(lang, 'chat', 'listening') : t(lang, 'chat', 'placeholder'))}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
@@ -441,7 +713,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
           <button
             onClick={() => handleSend()}
             disabled={isLoading || (!input.trim() && !selectedFile)}
-            className="absolute right-2 top-2 bottom-2 p-1.5 bg-primary-600 hover:bg-primary-500 rounded-md text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center w-10"
+            className={`absolute right-2 top-2 bottom-2 p-1.5 rounded-md text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center w-10 ${
+                editingImage ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-primary-600 hover:bg-primary-500'
+            }`}
             title={t(lang, 'chat', 'send')}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
