@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, FunctionDeclaration, GenerateContentResponse } from "@google/genai";
 import { searchPlaces } from "./googleMapsService";
 import { analyzeRoofImage } from "./annoBananaService";
@@ -291,13 +292,19 @@ const analyzePanelDnaTool: FunctionDeclaration = {
     }
 };
 
-const fetchProductionForecastTool: FunctionDeclaration = {
-  name: "fetch_production_forecast",
-  description: "Predictive production via Forecast.Solar technical engine (Backup provider).",
+const estimateSolarProductionTool: FunctionDeclaration = {
+  name: "estimate_solar_production",
+  description: "Calculate expected solar energy production (kWh/MWh) based on specific system configuration. Useful for ROI estimation.",
   parameters: {
     type: Type.OBJECT,
-    properties: { lat: { type: Type.NUMBER }, lng: { type: Type.NUMBER }, dec: { type: Type.NUMBER }, az: { type: Type.NUMBER }, kwp: { type: Type.NUMBER } },
-    required: ["lat", "lng", "kwp"]
+    properties: { 
+        latitude: { type: Type.NUMBER }, 
+        longitude: { type: Type.NUMBER }, 
+        kwp: { type: Type.NUMBER, description: "System installed capacity in kWp" },
+        tilt: { type: Type.NUMBER, description: "Panel tilt angle (0-90)" },
+        azimuth: { type: Type.NUMBER, description: "Panel azimuth (-180 to 180, 0 = South)" }
+    },
+    required: ["latitude", "longitude", "kwp"]
   }
 };
 
@@ -483,7 +490,7 @@ export class GeminiOrchestrator {
        }
 
        // Core Function Proxies
-       if (name === 'fetch_production_forecast') return { result: await fetchJson(`/solar/forecast?lat=${args.lat}&lng=${args.lng}&dec=${args.dec || 35}&az=${args.az || 0}&kwp=${args.kwp}`) };
+       if (name === 'estimate_solar_production') return { result: await fetchJson(`/solar/forecast?lat=${args.latitude}&lng=${args.longitude}&dec=${args.tilt || 35}&az=${args.azimuth || 0}&kwp=${args.kwp}`) };
        if (name === 'fetch_biodiversity_report') return { result: await fetchJson(`/biodiversity/nearby?lat=${args.lat}&lng=${args.lng}&radius=${args.radius || 5000}`) };
        if (name === 'calculate_carbon_impact') return { result: await fetchJson('/esg/carbon-impact', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(args) }) };
        if (name === 'reverse_geocode') return { result: await fetchJson(`/geo/reverse?lat=${args.lat}&lng=${args.lng}`) };
@@ -584,10 +591,12 @@ export class GeminiOrchestrator {
         effectiveModelId = GEMINI_PRO_MODEL_ID;
     }
 
-    // Thinking Config
+    // Thinking Config (Gemini 3 Pro Only)
     if (config.isThinking) {
-        effectiveConfig.thinkingConfig = { thinkingBudget: 32768 };
-        // Important: Do not set maxOutputTokens when using thinking
+        effectiveModelId = GEMINI_PRO_MODEL_ID; // Enforce Pro
+        effectiveConfig.thinkingConfig = { thinkingBudget: 32768 }; // Max Thinking Budget
+        // CRITICAL: Max Output Tokens must NOT be set when Thinking is active
+        if (effectiveConfig.maxOutputTokens) delete effectiveConfig.maxOutputTokens;
     }
 
     // Attach Tools (Only for standard chat, not image gen)
@@ -599,7 +608,7 @@ export class GeminiOrchestrator {
         
         // Helios Core
         generateSiteReportTool, fetchPlanetImageryTool, fetchSatelliteImageryTool, 
-        fetchProductionForecastTool, fetchBiodiversityReportTool, calculateCarbonImpactTool, 
+        estimateSolarProductionTool, fetchBiodiversityReportTool, calculateCarbonImpactTool, 
         reverseGeocodeTool, searchPlacesTool, searchSolarParksTool, 
         runSimulationTool, fetchPerformanceBenchmarkTool, analyzePredictiveFailureTool, executeEnergyTradeTool,
         planAgrivoltaicsTool, analyzePanelDnaTool

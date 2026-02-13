@@ -23,6 +23,7 @@ const PDF_GUIDE_FUNCTIONS = [
   { id: 12, name: 'Biodiversity Monitoring', api: 'GBIF / Copernicus', cat: 'Bio' },
   { id: 13, name: 'Energy Trading Bot', api: 'OPCOM / EIA', cat: 'Trading' },
   { id: 15, name: 'Agrivoltaics Planning', api: 'Geo-Spatial APIs', cat: 'Geo' },
+  { id: 16, name: 'Solar Production Estimate', api: 'Forecast.Solar Engine', cat: 'Engineering' },
   { id: 20, name: 'Panel DNA Analysis', api: 'Planet SkySat (50cm) + Clip Tool', cat: 'Satellite' },
 ];
 

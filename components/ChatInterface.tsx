@@ -17,16 +17,35 @@ interface ChatInterfaceProps {
   activeModel: string;
 }
 
+const THINKING_MESSAGES_RO = [
+    "Helios gândește strategia...",
+    "Helios analizează datele meteo...",
+    "Helios interoghează sateliții Planet Labs...",
+    "Helios verifică prețurile OPCOM...",
+    "Helios rulează simulări LSTM...",
+    "Helios formulează răspunsul tehnic..."
+];
+
+const THINKING_MESSAGES_EN = [
+    "Helios is now thinking deeply...",
+    "Helios is now analyzing weather patterns...",
+    "Helios is now connecting to Planet Labs satellites...",
+    "Helios is now verifying OPCOM market prices...",
+    "Helios is now running LSTM simulations...",
+    "Helios is now formulating the technical response..."
+];
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, activeModel }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   // Advanced Features State
-  const [isThinkingEnabled, setIsThinkingEnabled] = useState(false);
+  const [isThinkingEnabled, setIsThinkingEnabled] = useState(true); // Default to true for "Think More" capability
   const [showGenModal, setShowGenModal] = useState(false);
   const [genParams, setGenParams] = useState<{ prompt: string, size: ImageSize }>({ prompt: '', size: '1K' });
-  
+  const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
+
   // Image Editing Context
   const [editingImage, setEditingImage] = useState<{ data: string, mimeType: string, source: 'upload'|'gen' } | null>(null);
   
@@ -47,30 +66,54 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
 
   const QUICK_ACTIONS = [
     { 
-      id: 'planet_template', 
-      label: lang === 'ro' ? 'Monitorizare SkySat 50cm' : 'SkySat 50cm Monitor', 
-      icon: '🌍', 
-      prompt: lang === 'ro' ? 'Activează monitorizarea SkySat (50cm) cu max 5% nori și benzile NIR, Red, Blue pentru analiza vegetației.' : 'Trigger SkySat (50cm) monitoring with max 5% cloud cover and retrieve NIR, Red, and Blue bands for precision analysis.' 
+      id: 'trade_bot', 
+      label: lang === 'ro' ? 'AI Energy Trader' : 'AI Energy Trader', 
+      icon: '📈', 
+      prompt: lang === 'ro' 
+        ? 'Analizează prognoza meteo și prețurile OPCOM. Execută o strategie de tranzacționare (BUY/SELL) pentru următoarele 24h.' 
+        : 'Analyze weather forecast and OPCOM prices. Execute an energy trading strategy (BUY/SELL) for the next 24h.' 
     },
     { 
-      id: 'satellite_template', 
-      label: lang === 'ro' ? 'Analiză Satelitară' : 'Satellite Analysis', 
-      icon: '🛰️', 
-      prompt: lang === 'ro' ? 'Efectuează o analiză satelitară Sentinel pentru acest proiect. Calculează indicele NDVI și raportează riscurile de vegetație sau anomalii termice în perimetru.' : 'Perform a comprehensive satellite analysis for this project. Calculate NDVI vegetation health indices and report any thermal anomalies or environmental risks in the area.' 
+      id: 'predict_fail', 
+      label: lang === 'ro' ? 'Predicție Avarii (LSTM)' : 'Predict Failures (LSTM)', 
+      icon: '🔧', 
+      prompt: lang === 'ro' 
+        ? 'Rulează modelul LSTM pentru a prezice defectarea invertoarelor sau a string-urilor în următoarele 14 zile.' 
+        : 'Run the LSTM predictive model to forecast component failures (inverters/strings) for the upcoming 14 days.' 
     },
     { 
-      id: 'anomalies_template', 
-      label: lang === 'ro' ? 'Detecție Anomalii' : 'Anomaly Detection', 
-      icon: '🧠', 
-      prompt: lang === 'ro' ? 'Rulează o analiză completă de anomalii de sistem. Compară telemetria actuală cu valorile așteptate și identifică pierderile de performanță.' : 'Run a full system anomaly analysis. Compare current telemetry with expected generation values and identify specific performance gaps or equipment failures.' 
+      id: 'agri_plan', 
+      label: lang === 'ro' ? 'Plan Agrivoltaic' : 'Agrivoltaics Plan', 
+      icon: '🌱', 
+      prompt: lang === 'ro' 
+        ? 'Generează un studiu de compatibilitate agrivoltaică. Ce culturi sunt potrivite aici și care este impactul umbririi?' 
+        : 'Generate an agrivoltaics compatibility study. Which crops are suitable here and what is the shading impact?' 
     },
     { 
-      id: 'audit_template', 
-      label: lang === 'ro' ? 'Audit Tehnic' : 'Technical Audit', 
-      icon: '📊', 
-      prompt: lang === 'ro' ? 'Generează un raport tehnic complet (Site Report). Sintetizează datele PVsyst, prognoza meteo curentă și impactul ESG într-un rezumat executiv.' : 'Generate a comprehensive technical site audit. Synthesize PVsyst simulation data, current meteo forecasts, and ESG impact metrics into an executive summary.' 
+      id: 'benchmark', 
+      label: lang === 'ro' ? 'Benchmark Flotă' : 'Fleet Benchmark', 
+      icon: '🏆', 
+      prompt: lang === 'ro' 
+        ? 'Compară performanța acestui parc (PR, Randament) cu media regională și cu cei mai buni performeri.' 
+        : 'Compare this park\'s performance (PR, Yield) against the regional fleet average and top performers.' 
     },
   ];
+
+  // Thinking Message Cycler
+  useEffect(() => {
+    let interval: any;
+    if (isLoading) {
+        interval = setInterval(() => {
+            setThinkingMessageIndex(prev => {
+                const msgs = lang === 'ro' ? THINKING_MESSAGES_RO : THINKING_MESSAGES_EN;
+                return (prev + 1) % msgs.length;
+            });
+        }, 2200); // Change message every 2.2 seconds to allow reading
+    } else {
+        setThinkingMessageIndex(0);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading, lang]);
 
   // Listen for report generation triggers from other components
   useEffect(() => {
@@ -448,6 +491,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
                           {(['1K', '2K', '4K'] as ImageSize[]).map(size => (
                               <button
                                 key={size}
+                                // Fix: Use correct state setter setGenParams instead of undefined setParams
                                 onClick={() => setGenParams({...genParams, size})}
                                 className={`flex-1 py-2 rounded font-mono text-sm border transition-all ${genParams.size === size ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}
                               >
@@ -575,12 +619,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
         ))}
         
         {isLoading && messages.length > 0 && messages[messages.length - 1].role === 'model' && messages[messages.length - 1].content === '' && (
-            <div className="flex justify-start animate-pulse">
-                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                    <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                        <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                        <div className="w-1.5 h-1.5 bg-slate-500 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+            <div className="flex justify-start w-full">
+                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 max-w-[85%] animate-pulse">
+                    <div className="flex items-center gap-3">
+                        <div className="flex gap-1">
+                            <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                            <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                            <div className="w-1.5 h-1.5 bg-violet-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                        </div>
+                        <span className="text-xs font-mono text-violet-300">
+                             {lang === 'ro' ? THINKING_MESSAGES_RO[thinkingMessageIndex] : THINKING_MESSAGES_EN[thinkingMessageIndex]}
+                        </span>
                     </div>
                 </div>
             </div>

@@ -1,166 +1,130 @@
-import { SolarPark } from '../types';
 
-// Helper to estimate revenue based on MW (approx €1000/MW/day for demo variance)
-const estimateRev = (mw: number) => Math.floor(mw * 350 * (0.8 + Math.random() * 0.4));
-// Helper to estimate CO2 based on MW
-const estimateCO2 = (mw: number) => Math.floor(mw * 1100); 
+import { SolarPark } from '../types';
 
 export const ROMANIAN_SOLAR_PARKS: SolarPark[] = [
   {
     id: 'ro_pv_021',
-    name: 'Parc Fotovoltaic Pilu-Grăniceri (Arad 1)',
+    name: 'Arad Mega Solar Park (Europe\'s Largest)',
     county: 'Arad',
     region: 'Vest',
-    capacityMw: 1065,
-    operator: 'Rezolv Energy',
-    status: 'Under Development - Approved by ANPM',
+    capacityMw: 1044,
+    operator: 'Monsson / Rezolv Energy',
+    status: 'Under Construction',
     location: { lat: 46.22, lng: 20.95 },
-    technicalDetails: 'CEL MAI MARE PARC DIN EUROPA. 1065 MW, 1065 hectare, 1,790,000 panouri. Include 500 MW stocare baterii.',
-    notes: 'CEL MAI MARE PARC FOTOVOLTAIC DIN ROMÂNIA ȘI EUROPA',
+    technicalDetails: 'Pilu/Graniceri area. €800M investment. Largest PV park in Europe upon completion. Includes battery storage.',
     healthScore: 98,
-    dailyRevenueEur: 0, // Not operational yet
+    dailyRevenueEur: 0,
     panelsCount: 1790000,
-    co2AvoidedTons: 1150000,
-    predictionAlerts: ['Construction Phase: Grid connection on schedule', 'Supply Chain: Inverter delivery optimized']
+    co2AvoidedTons: 1150000
   },
   {
     id: 'ro_pv_001',
-    name: 'Parc Fotovoltaic Livada (Ciuperceni)',
+    name: 'Livada/Ciuperceni Solar Park',
     county: 'Satu Mare',
     region: 'Nord-Vest',
     capacityMw: 56,
     operator: 'GPSB Solaris 48 SRL',
     commissionedDate: '2013-11',
     status: 'Operational',
-    location: { lat: 47.86667, lng: 23.13333 },
-    investment: '105 mil EUR',
-    technicalDetails: '135 hectare, 230,000 panouri, Producție anuală: 67 GWh. Cel mai mare parc la momentul construcției (2013).',
-    notes: 'Cel mai mare parc fotovoltaic din România la momentul construcției',
+    location: { lat: 47.868, lng: 23.054 },
+    investment: '€105M',
+    technicalDetails: '135 hectares, 230,000 units. Ranked #1 in capacity of the legacy 2013 boom era.',
     healthScore: 84,
     dailyRevenueEur: 18500,
     panelsCount: 230000,
-    co2AvoidedTons: 62000,
-    predictionAlerts: ['Inverter 3C: Thermal anomaly detected (+12°C)', 'Soiling Level: 14% (Cleaning recommended)']
-  },
-  {
-    id: 'ro_pv_004',
-    name: 'Centrala Fotovoltaică Lumina (Călugăreni)',
-    county: 'Giurgiu',
-    region: 'Sud-Muntenia',
-    capacityMw: 63,
-    operator: 'PPC Renewables România',
-    commissionedDate: '2023',
-    status: 'Operational',
-    location: { lat: 44.2, lng: 26.05 },
-    investment: '',
-    technicalDetails: '88 hectare, 120,000 panouri, Producție anuală: 99 GWh. Cel mai mare din portofoliul PPC Renewables.',
-    notes: 'Cel mai mare parc din portofoliul PPC Renewables România',
-    healthScore: 96,
-    dailyRevenueEur: 24000,
-    panelsCount: 120000,
-    co2AvoidedTons: 71000,
-    predictionAlerts: ['Trading Bot: €2,400 arbitrage opportunity executed', 'System: Optimal Performance']
+    co2AvoidedTons: 62000
   },
   {
     id: 'ro_pv_002',
-    name: 'Parc Fotovoltaic Izvoarele',
+    name: 'Izvoarele Solar Park',
     county: 'Giurgiu',
     region: 'Sud-Muntenia',
-    capacityMw: 50,
-    operator: 'LJG Green Source Energy Gamma SRL',
+    capacityMw: 42.5,
+    operator: 'LJG Green Source Energy Gamma',
     commissionedDate: '2013',
     status: 'Operational',
-    location: { lat: 43.95, lng: 25.85 },
-    investment: '77 mil EUR',
-    technicalDetails: '125 hectare, 215,000 panouri, Producție anuală: 60 GWh.',
-    notes: '',
+    location: { lat: 44.045, lng: 25.7972 },
+    investment: '€77M',
+    technicalDetails: '125 hectares, 215,000 panels. Ranked #2 in legacy ranking.',
     healthScore: 78,
     dailyRevenueEur: 16200,
     panelsCount: 215000,
-    co2AvoidedTons: 55000,
-    predictionAlerts: ['Warning: Degradation rate above 1.2% in Sector 4', 'Maintenance: Transformer oil check needed']
+    co2AvoidedTons: 55000
   },
   {
-    id: 'ro_pv_013',
-    name: 'Parc Fotovoltaic Văcărești',
-    county: 'Dâmbovița',
+    id: 'ro_pv_003',
+    name: 'Slobozia Solar Park',
+    county: 'Giurgiu',
     region: 'Sud-Muntenia',
-    capacityMw: 126,
-    operator: 'DRI Energy',
-    commissionedDate: '2025-12',
+    capacityMw: 38,
+    operator: 'LJG Green Source Energy Alpha',
+    commissionedDate: '2013-09',
     status: 'Operational',
-    location: { lat: 44.65, lng: 25.55 },
-    technicalDetails: 'Capacitate 126 MW, reducere CO2: 88,200 tone.',
-    notes: '',
-    healthScore: 99,
-    dailyRevenueEur: 42000,
-    panelsCount: 245000,
-    co2AvoidedTons: 88200,
-    predictionAlerts: ['Biodiversity: Eagle nesting detected in Sector North', 'Performance: Top 3% in region']
+    location: { lat: 43.8583, lng: 25.9066 },
+    investment: '€100M',
+    technicalDetails: '113 hectares, 180,000 units. Ranked #3 in legacy ranking.',
+    healthScore: 88,
+    dailyRevenueEur: 14500,
+    panelsCount: 180000,
+    co2AvoidedTons: 42000
   },
-  // ... (Other parks would be updated similarly, preserving the list structure for brevity)
   {
-    id: 'ro_pv_022',
-    name: 'Parc Fotovoltaic Nădab 1',
-    county: 'Arad',
-    region: 'Vest',
-    capacityMw: 370,
-    operator: 'PPC Renewables (DARA Solar)',
-    status: 'Under Development',
-    location: { lat: 46.485, lng: 21.501 },
-    technicalDetails: '370 MW, 370 hectare, 622,000 panouri. Preluat de PPC de la Enel Green Power.',
-    notes: 'Preluat de PPC Renewables de la Enel Green Power',
+    id: 'ro_pv_004',
+    name: 'Ucea de Sus Complex',
+    county: 'Brașov',
+    region: 'Centru',
+    capacityMw: 46,
+    operator: 'Green Vision Seven SRL',
+    commissionedDate: '2013-12',
+    status: 'Operational',
+    location: { lat: 45.65, lng: 25.61 },
+    investment: '€100M',
+    technicalDetails: '200 hectares combined (Ucea 1: 28MW, Ucea 2: 18MW). Uses Thin-Film technology (332,000 units).',
     healthScore: 92,
-    dailyRevenueEur: 0,
-    panelsCount: 622000,
-    co2AvoidedTons: 407000,
-    predictionAlerts: []
+    dailyRevenueEur: 17800,
+    panelsCount: 332000,
+    co2AvoidedTons: 50000
   },
   {
-    id: 'ro_pv_024',
-    name: 'Parc Fotovoltaic Vișina',
-    county: 'Dâmbovița',
+    id: 'ro_pv_009',
+    name: 'Tenaris Călărași',
+    county: 'Călărași',
     region: 'Sud-Muntenia',
-    capacityMw: 220,
-    operator: 'Eurowind Energy',
-    status: 'Under Construction',
-    location: { lat: 44.73, lng: 25.68 },
-    technicalDetails: '220 MW, 354 hectare, 400,000 panouri.',
-    notes: '',
-    healthScore: 95,
-    dailyRevenueEur: 0,
-    panelsCount: 400000,
-    co2AvoidedTons: 242000,
-    predictionAlerts: []
+    capacityMw: 20,
+    operator: 'Tenaris Romania',
+    commissionedDate: '2025-01',
+    status: 'Operational',
+    location: { lat: 44.2, lng: 27.33 },
+    technicalDetails: 'Industrial self-consumption facility for steel manufacturing. $21.5M investment.',
+    healthScore: 97,
+    dailyRevenueEur: 8000,
+    panelsCount: 45000
+  },
+  {
+    id: 'ro_pv_010',
+    name: 'Saint-Gobain Călărași',
+    county: 'Călărași',
+    region: 'Sud-Muntenia',
+    capacityMw: 8.6,
+    operator: 'Engie / Saint-Gobain',
+    commissionedDate: '2022',
+    status: 'Operational',
+    location: { lat: 44.2, lng: 27.33 },
+    technicalDetails: 'First and largest pure self-consumption project in Romania. Covers 20% of factory needs.',
+    healthScore: 99,
+    dailyRevenueEur: 3500,
+    panelsCount: 18000
   }
 ];
 
 export const searchParks = (query: string): SolarPark[] => {
     const q = query.toLowerCase().trim();
-    
-    // 1. Căutare Inteligentă pentru interogări generice
-    if (q === 'romania' || q === 'toate' || q === 'lista' || q.includes('cate') || q.includes('total') || q.includes('parcuri')) {
+    if (q === 'romania' || q === 'toate' || q === 'top') {
         return ROMANIAN_SOLAR_PARKS;
     }
-
-    // 2. Sortare după mărime
-    if (q.includes('mare') || q.includes('largest') || q.includes('top')) {
-        return [...ROMANIAN_SOLAR_PARKS]
-            .sort((a, b) => b.capacityMw - a.capacityMw)
-            .slice(0, 10);
-    }
-
-    // 3. Filtrare specifică
-    const results = ROMANIAN_SOLAR_PARKS.filter(p => 
+    return ROMANIAN_SOLAR_PARKS.filter(p => 
         p.name.toLowerCase().includes(q) || 
         p.county.toLowerCase().includes(q) || 
-        (p.region && p.region.toLowerCase().includes(q)) ||
         p.operator.toLowerCase().includes(q)
     );
-
-    if (results.length === 0 && q.includes('romania')) {
-        return ROMANIAN_SOLAR_PARKS;
-    }
-
-    return results;
 };
