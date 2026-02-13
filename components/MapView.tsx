@@ -150,46 +150,50 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                 className={`w-full h-full object-cover transition-all duration-1000 ${planetData ? 'opacity-90 saturate-125' : 'opacity-60'}`} 
             />
             
-            <div className="absolute top-4 left-4 z-20 flex flex-col gap-2">
-                <div className="bg-slate-900/95 backdrop-blur-xl border border-emerald-500/30 p-4 rounded-xl shadow-2xl w-85">
+            {/* FLOATING DATA OVERLAY */}
+            <div className="absolute top-2 left-2 md:top-4 md:left-4 z-20 flex flex-col gap-2 max-h-[90%] w-[96%] md:w-auto md:max-w-sm">
+                
+                {/* HEADS UP DISPLAY */}
+                <div className="bg-slate-900/95 backdrop-blur-xl border border-emerald-500/30 p-3 md:p-4 rounded-xl shadow-2xl w-full">
                     <div className="flex items-start justify-between mb-2">
-                        <div>
+                        <div className="flex-1 min-w-0 pr-2">
                             <div className="flex items-center gap-2 mb-1">
                                 <span className={`relative flex h-2 w-2`}>
                                   <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${planetData ? 'bg-indigo-400' : 'bg-emerald-400'} opacity-75`}></span>
                                   <span className={`relative inline-flex rounded-full h-2 w-2 ${planetData ? 'bg-indigo-500' : 'bg-emerald-500'}`}></span>
                                 </span>
-                                <span className={`text-[10px] font-mono uppercase ${planetData ? 'text-indigo-400' : 'text-emerald-400'} tracking-wider font-bold`}>
-                                    {planetData ? 'Planet Labs 3.0m Daily' : (satelliteData ? 'Copernicus Sentinel' : 'Digital Asset Feed')}
+                                <span className={`text-[9px] md:text-[10px] font-mono uppercase ${planetData ? 'text-indigo-400' : 'text-emerald-400'} tracking-wider font-bold truncate`}>
+                                    {planetData ? 'Planet Labs 3.0m' : (satelliteData ? 'Copernicus Sentinel' : 'Digital Asset Feed')}
                                 </span>
                             </div>
-                            <h3 className="text-white font-bold text-lg leading-tight truncate max-w-[220px]">
+                            <h3 className="text-white font-bold text-base md:text-lg leading-tight truncate">
                                 {currentSolarPark ? currentSolarPark.name : (currentPlace?.name || 'Asset View')}
                             </h3>
                         </div>
                         {planetData && (
-                            <div className="bg-indigo-600/20 border border-indigo-500/50 px-2 py-0.5 rounded text-[9px] font-mono text-indigo-300 font-bold">
+                            <div className="bg-indigo-600/20 border border-indigo-500/50 px-2 py-0.5 rounded text-[8px] md:text-[9px] font-mono text-indigo-300 font-bold whitespace-nowrap">
                                 HI-RES
                             </div>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 mt-3">
+                    <div className="grid grid-cols-2 gap-2 mt-2 md:mt-3">
                          <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
                              <p className="text-slate-500 font-mono text-[9px] uppercase">Temperature</p>
-                             <p className="text-lg font-bold text-amber-400">{weatherData?.current?.temperature_2m || '22.4'}°C</p>
+                             <p className="text-base md:text-lg font-bold text-amber-400">{weatherData?.current?.temperature_2m || '22.4'}°C</p>
                          </div>
                          <div className="bg-slate-950/60 p-2 rounded border border-slate-800">
                              <p className="text-slate-500 font-mono text-[9px] uppercase">NDVI Index</p>
-                             <p className={`text-lg font-bold ${getNDVIColor(planetData?.ndvi_mean || satelliteData?.analysis?.ndvi || 0.52)}`}>
+                             <p className={`text-base md:text-lg font-bold ${getNDVIColor(planetData?.ndvi_mean || satelliteData?.analysis?.ndvi || 0.52)}`}>
                                 {planetData?.ndvi_mean || satelliteData?.analysis?.ndvi || '0.52'}
                              </p>
                          </div>
                     </div>
                 </div>
 
-                <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl w-85 overflow-hidden transition-all duration-300">
-                    <div className="flex border-b border-slate-700">
+                {/* TABS & DETAILS CARD */}
+                <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl w-full overflow-hidden transition-all duration-300 flex-1 flex flex-col min-h-0">
+                    <div className="flex border-b border-slate-700 shrink-0">
                         {(['overview', 'sat', 'meteo'] as const).map(tab => (
                             <button
                                 key={tab}
@@ -205,7 +209,7 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                         ))}
                     </div>
                     
-                    <div className="p-4 min-h-[160px]">
+                    <div className="p-3 md:p-4 overflow-y-auto custom-scrollbar flex-1">
                         {activeTab === 'sat' && (
                             <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
                                 {planetData ? (
@@ -230,10 +234,6 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="bg-emerald-900/20 p-2 rounded text-[10px] font-mono text-emerald-300 border border-emerald-900/50 flex justify-between">
-                                            <span>DAILY REVISIT STATUS:</span>
-                                            <span className="font-bold">ACTIVE</span>
-                                        </div>
                                     </div>
                                 ) : satelliteData ? (
                                     <div className="space-y-2">
@@ -253,11 +253,9 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="text-[9px] text-slate-500 font-mono italic">Provider: {satelliteData.provider}</div>
                                     </div>
                                 ) : (
-                                    <div className="text-center py-10 flex flex-col items-center gap-2">
-                                        <svg className="text-slate-700 animate-pulse" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+                                    <div className="text-center py-4 flex flex-col items-center gap-2">
                                         <p className="text-slate-500 text-xs italic">Trigger a satellite analysis for high-precision monitoring.</p>
                                     </div>
                                 )}
@@ -268,12 +266,11 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                 <p><span className="text-slate-500">Asset Name:</span> {currentSolarPark?.name || currentPlace?.name}</p>
                                 <p><span className="text-slate-500">Location:</span> {currentSolarPark?.county || 'Strategic Region'}, RO</p>
                                 {currentSolarPark && <p><span className="text-slate-500">System Capacity:</span> {currentSolarPark.capacityMw} MWp</p>}
-                                <p><span className="text-slate-500">Coordinates:</span> {currentSolarPark?.location.lat.toFixed(4) || currentPlace?.location.lat.toFixed(4)}, {currentSolarPark?.location.lng.toFixed(4) || currentPlace?.location.lng.toFixed(4)}</p>
+                                <p className="truncate"><span className="text-slate-500">Coords:</span> {currentSolarPark?.location.lat.toFixed(4) || currentPlace?.location.lat.toFixed(4)}, {currentSolarPark?.location.lng.toFixed(4) || currentPlace?.location.lng.toFixed(4)}</p>
                                 
                                 {currentSolarPark && currentSolarPark.co2AvoidedTons && (
                                     <div className="bg-emerald-900/10 border border-emerald-500/20 p-2 rounded mt-2">
                                         <div className="flex items-center gap-1.5 mb-1">
-                                            <svg className="text-emerald-500" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22a8 8 0 1 1 16 0"/><path d="M12 2v20"/><path d="M2 10h20"/></svg>
                                             <span className="text-[10px] font-mono uppercase text-emerald-400 font-bold">ESG: Carbon Impact</span>
                                         </div>
                                         <div className="flex justify-between items-end">
@@ -283,7 +280,7 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-xs text-emerald-300">~{Math.round(currentSolarPark.co2AvoidedTons / 0.02)}</p>
-                                                <p className="text-[9px] text-slate-500">Trees Equivalent</p>
+                                                <p className="text-[9px] text-slate-500">Trees</p>
                                             </div>
                                         </div>
                                     </div>
@@ -291,40 +288,36 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
 
                                 <div className="mt-2 pt-2 border-t border-slate-800 flex justify-between">
                                     <span className="text-slate-500 uppercase text-[9px]">Operator</span>
-                                    <span className="text-emerald-400 font-bold">{currentSolarPark?.operator || 'External'}</span>
+                                    <span className="text-emerald-400 font-bold truncate max-w-[150px]">{currentSolarPark?.operator || 'External'}</span>
                                 </div>
                              </div>
                         )}
                     </div>
 
                     {/* ACTION GRID */}
-                    <div className="px-4 pb-4">
+                    <div className="px-3 pb-3 md:px-4 md:pb-4 shrink-0">
                         <div className="grid grid-cols-2 gap-2 mb-2">
                             <button 
                                 onClick={() => triggerAction('ndvi')}
                                 className="bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 border border-emerald-500/30 p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-                                title="Run NDVI Planet Toolchain"
                             >
-                                <span>🌱</span> NDVI Analiza
+                                <span>🌱</span> NDVI
                             </button>
                             <button 
                                 onClick={() => triggerAction('skysat')}
                                 className="bg-slate-800 hover:bg-slate-700 text-primary-400 border border-primary-500/30 p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-                                title="SkySat 50cm"
                             >
                                 <span>🌍</span> SkySat
                             </button>
                             <button 
                                 onClick={() => triggerAction('satellite')}
                                 className="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-                                title="Sat Analysis"
                             >
-                                <span>🛰️</span> Sat Analysis
+                                <span>🛰️</span> Sat
                             </button>
                             <button 
                                 onClick={() => triggerAction('anomaly')}
                                 className="bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 p-2 rounded text-[10px] font-bold flex items-center justify-center gap-1 transition-colors"
-                                title="Anomaly Detect"
                             >
                                 <span>🧠</span> Anomaly
                             </button>
@@ -340,18 +333,18 @@ const MapView: React.FC<MapViewProps> = ({ activeToolLog, lang }) => {
                 </div>
             </div>
 
-            {/* Scale Indicator */}
-            <div className="absolute bottom-6 left-6 z-20 flex items-center gap-3 bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded text-[10px] font-mono text-slate-400">
+            {/* Scale Indicator - Responsive Position */}
+            <div className="absolute bottom-20 md:bottom-6 left-2 md:left-6 z-10 flex items-center gap-3 bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded text-[10px] font-mono text-slate-400 pointer-events-none">
                 <div className="w-12 h-1 bg-slate-700 relative">
                     <div className="absolute top-0 left-0 w-6 h-full bg-white"></div>
                 </div>
                 <span>50m</span>
                 <span className="text-slate-600">|</span>
-                <span>Z-Level: 18.4</span>
+                <span>Z: 18.4</span>
             </div>
         </>
       ) : (
-        <div className="text-center p-12 border border-dashed border-slate-800 rounded-3xl bg-slate-900/30 flex flex-col items-center max-w-sm">
+        <div className="text-center p-8 md:p-12 border border-dashed border-slate-800 rounded-3xl bg-slate-900/30 flex flex-col items-center max-w-[90%] md:max-w-sm">
             <div className="w-16 h-16 bg-slate-800 rounded-2xl mb-4 flex items-center justify-center text-slate-600">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             </div>

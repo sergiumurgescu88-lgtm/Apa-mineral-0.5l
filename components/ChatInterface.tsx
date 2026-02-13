@@ -55,10 +55,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const QUICK_ACTIONS = [
+    { 
+        id: 'health_scan', 
+        label: lang === 'ro' ? 'Scanare Sănătate (Complet)' : 'Full Health Scan', 
+        icon: '🏥', 
+        prompt: lang === 'ro' 
+            ? 'Analizează starea de sănătate a parcului solar folosind imaginile din satelit și datele de telemetrie. Identifică indicatori cheie precum NDVI, anomalii termice și statusul operațional.' 
+            : 'Analyze the health of the solar park using the provided satellite imagery and telemetry data. Identify key performance indicators like NDVI, temperature anomalies, and overall operational status.' 
+    },
     { id: 'trade_bot', label: lang === 'ro' ? 'AI Energy Trader' : 'AI Energy Trader', icon: '📈', prompt: lang === 'ro' ? 'Analizează prognoza meteo și prețurile OPCOM. Execută o strategie de tranzacționare (BUY/SELL) pentru următoarele 24h.' : 'Analyze weather forecast and OPCOM prices. Execute an energy trading strategy (BUY/SELL) for the next 24h.' },
     { id: 'predict_fail', label: lang === 'ro' ? 'Predicție Avarii (LSTM)' : 'Predict Failures (LSTM)', icon: '🔧', prompt: lang === 'ro' ? 'Rulează modelul LSTM pentru a prezice defectarea invertoarelor sau a string-urilor în următoarele 14 zile.' : 'Run the LSTM predictive model to forecast component failures (inverters/strings) for the upcoming 14 days.' },
     { id: 'agri_plan', label: lang === 'ro' ? 'Plan Agrivoltaic' : 'Agrivoltaics Plan', icon: '🌱', prompt: lang === 'ro' ? 'Generează un studiu de compatibilitate agrivoltaică. Ce culturi sunt potrivite aici și care este impactul umbririi?' : 'Generate an agrivoltaics compatibility study. Which crops are suitable here and what is the shading impact?' },
-    { id: 'soiling_analiza', label: lang === 'ro' ? 'Analiză Soiling' : 'Soiling Analysis', icon: '🧼', prompt: lang === 'ro' ? 'Analizează poluarea (PM10) și prognoza de ploaie pentru a estima pierderile prin soiling.' : 'Analyze PM10 pollution and rain forecast to estimate soiling losses.' },
   ];
 
   useEffect(() => {
@@ -135,7 +142,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
     const dateStr = new Date().toLocaleString('ro-RO');
     const fullText = messages.map(m => m.content).join(' ').toLowerCase();
 
-    // 1. Technical Insight Extraction (Auto-Summarization)
+    // Auto-Summarization
     const insights = [];
     if (fullText.includes('trade') || fullText.includes('opcom')) insights.push("- Strategie de tranzacționare OPCOM bazată pe prognoză.");
     if (fullText.includes('satelit') || fullText.includes('planet')) insights.push("- Analiză NDVI & Soiling via telemetrie satelitară Planet Labs.");
@@ -143,7 +150,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ onToolActivity, lang, act
     if (fullText.includes('carbon') || fullText.includes('esg')) insights.push("- Cuantificare impact ESG și evitare emisii CO2.");
     if (insights.length === 0) insights.push("- Audit tehnic general și verificare sănătate sistem.");
 
-    // 2. Build ASCII Report Structure
+    // ASCII Report Structure
     let report = `================================================================================
                          RAPORT TEHNIC DE ANALIZĂ HELIOS
                    Sistem Expert în Infrastructură Fotovoltaică
@@ -173,17 +180,14 @@ ${insights.join('\n')}
 3. TRANSCRIPT COMPLET ORCHESTRARE (LOG TEHNIC)
 --------------------------------------------------------------------------------\n\n`;
 
-    // 3. Format Conversation
     messages.forEach(msg => {
       const isHelios = msg.role === 'model';
-      // Use clean, professional labels
       const role = isHelios ? "[HELIOS ARCHITECT]" : "[CLIENT TECHNICAL LEAD]";
       const time = new Date(msg.timestamp).toLocaleTimeString('ro-RO');
       
       report += `[${time}] ${role}\n`;
-      report += `${"-".repeat(role.length + 13)}\n`; // Dynamic separator length
+      report += `${"-".repeat(role.length + 13)}\n`; 
       
-      // Clean up markdown bolding for plain text readability
       const cleanContent = msg.content.replace(/\*\*/g, "").replace(/###/g, ">>");
       report += `${cleanContent}\n\n`;
       
@@ -201,7 +205,6 @@ ${insights.join('\n')}
                   Generat automat de Helios R&D AI Architect.
 ================================================================================`;
 
-    // 4. Download with BOM for Romanian Diacritics
     const blob = new Blob(['\ufeff', report], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -258,15 +261,15 @@ ${insights.join('\n')}
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border-l border-slate-800 relative">
-      <div className="p-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur-sm sticky top-0 z-10 flex justify-between items-center">
+    <div className="flex flex-col h-full bg-slate-900 relative">
+      <div className="p-3 md:p-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur-sm sticky top-0 z-10 flex justify-between items-center shrink-0">
         <h2 className="text-sm font-mono font-semibold text-primary-400 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          HELIOS
+          HELIOS AI
         </h2>
         
-        <div className="flex items-center gap-3">
-            <button onClick={() => setIsThinkingEnabled(!isThinkingEnabled)} className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isThinkingEnabled ? 'bg-violet-600 text-white shadow-lg' : 'text-slate-400 hover:text-white border border-slate-700'}`}>
+        <div className="flex items-center gap-2 md:gap-3">
+            <button onClick={() => setIsThinkingEnabled(!isThinkingEnabled)} className={`px-2 md:px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isThinkingEnabled ? 'bg-violet-600 text-white shadow-lg' : 'text-slate-400 hover:text-white border border-slate-700'}`}>
                 🧠 THINK
             </button>
             <div className="flex gap-1 border-l border-slate-700 pl-3">
@@ -277,10 +280,10 @@ ${insights.join('\n')}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 md:space-y-6">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-            <div className={`max-w-[85%] rounded-lg p-3 text-sm leading-relaxed ${msg.role === 'user' ? 'bg-primary-600 text-white shadow-lg' : 'bg-slate-800 text-slate-200 border border-slate-700'}`}>
+            <div className={`max-w-[88%] md:max-w-[85%] rounded-lg p-3 text-sm leading-relaxed shadow-sm ${msg.role === 'user' ? 'bg-primary-600 text-white shadow-lg' : 'bg-slate-800 text-slate-200 border border-slate-700'}`}>
               <div className="whitespace-pre-wrap">{msg.content}</div>
               {msg.image && <img src={msg.image} className="mt-3 rounded border border-slate-700 max-w-full" alt="content" />}
             </div>
@@ -296,23 +299,31 @@ ${insights.join('\n')}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 bg-slate-950 border-t border-slate-800">
+      <div className="p-3 md:p-4 bg-slate-950 border-t border-slate-800 shrink-0">
         <div className="flex gap-2 mb-3 overflow-x-auto pb-1 no-scrollbar">
             {QUICK_ACTIONS.map(action => (
-                <button key={action.id} onClick={() => handleSend(action.prompt)} disabled={isLoading} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-full text-xs whitespace-nowrap text-slate-300 transition-all">
+                <button key={action.id} onClick={() => handleSend(action.prompt)} disabled={isLoading} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-full text-xs whitespace-nowrap text-slate-300 transition-all shrink-0">
                     <span>{action.icon}</span> {action.label}
                 </button>
             ))}
         </div>
 
         <div className="relative flex gap-2">
-          <button onClick={toggleListening} className={`p-3 rounded-lg border transition-all ${isListening ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+          <button onClick={toggleListening} className={`p-2 md:p-3 rounded-lg border transition-all shrink-0 ${isListening ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
              {isListening ? 'STOP' : '🎤'}
           </button>
-          <button onClick={() => fileInputRef.current?.click()} className="p-3 bg-slate-800 text-slate-400 rounded-lg border border-slate-700">📎</button>
+          <button onClick={() => fileInputRef.current?.click()} className="p-2 md:p-3 bg-slate-800 text-slate-400 rounded-lg border border-slate-700 shrink-0">📎</button>
           <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,.pdf" className="hidden" />
-          <input type="text" className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white focus:ring-1 focus:ring-primary-500 outline-none" placeholder={isListening ? "Listening..." : "Ask Helios..."} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSend()} disabled={isLoading} />
-          <button onClick={() => handleSend()} disabled={isLoading || (!input.trim() && !selectedFile)} className="bg-primary-600 hover:bg-primary-500 px-4 rounded-lg text-white transition-colors">🚀</button>
+          <input 
+            type="text" 
+            className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 md:px-4 py-2 md:py-3 text-sm text-white focus:ring-1 focus:ring-primary-500 outline-none min-w-0" 
+            placeholder={isListening ? "Listening..." : "Ask Helios..."} 
+            value={input} 
+            onChange={(e) => setInput(e.target.value)} 
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+            disabled={isLoading} 
+          />
+          <button onClick={() => handleSend()} disabled={isLoading || (!input.trim() && !selectedFile)} className="bg-primary-600 hover:bg-primary-500 px-3 md:px-4 rounded-lg text-white transition-colors shrink-0">🚀</button>
         </div>
       </div>
     </div>
